@@ -1,39 +1,28 @@
 import { player, gameState, inventory, recalcDerivedStats } from './state.js';
-import { SKILLS } from './data/skills.js'; 
+import { SKILLS } from './data/skills.js';
 
-// 狀態條 Helper
+// Helper
 function createBar(label, emoji, current, max, colorClass) {
     const pct = max > 0 ? Math.max(0, Math.min(100, (current / max * 100))) : 0;
-    return `
-        <div class="stat-bar-wrap">
-            <span class="small-label">${emoji} ${label}：${Math.floor(current)}/${Math.floor(max)}</span>
-            <div class="bar">
-                <div class="bar-inner ${colorClass}" style="width:${pct}%;"></div>
-            </div>
-        </div>
-    `;
+    return `<div class="stat-bar-wrap"><span class="small-label">${emoji} ${label}：${Math.floor(current)}/${Math.floor(max)}</span><div class="bar"><div class="bar-inner ${colorClass}" style="width:${pct}%;"></div></div></div>`;
 }
 
-// ==========================================
-// 統一的 Log 系統
-// ==========================================
+// Log System
 export function addLog(text, colorClass = "") {
     if (!gameState.logs) gameState.logs = [];
     gameState.logs.push({ text, color: colorClass });
     if (gameState.logs.length > 30) gameState.logs.shift();
     renderMainScreen();
 }
-
-export function writeEvent(text) { addLog(text, ""); }
+export function writeEvent(text) { addLog(text.replace(/<[^>]*>/g, ""), ""); }
 export function addBattleLog(text, color) { addLog(text, color); }
 
-// ==========================================
-// 核心：主畫面渲染 (這裡會用到 SKILLS)
-// ==========================================
+// Main Render
 export function renderMainScreen() {
     const box = document.getElementById("eventBox");
+    if (!box) return; 
     
-    // 1. Log 區塊
+    // Log
     let logHtml = "";
     if (gameState.logs && gameState.logs.length > 0) {
         gameState.logs.forEach(log => {
@@ -43,80 +32,62 @@ export function renderMainScreen() {
             else if (log.color === "log-system") style = "color:#74b9ff";
             logHtml += `<div style="${style}">${log.text}</div>`;
         });
-    } else {
-        logHtml = `<div style="opacity:0.5">日誌是空的...</div>`;
-    }
+    } else { logHtml = `<div style="opacity:0.5">日誌是空的...</div>`; }
     const logSection = `<div class="mini-log">${logHtml}</div>`;
 
-    // 2. 上方與按鈕區塊
+    // Top & Actions
     let topSection = "";
     let actionButtons = ""; 
 
     if (gameState.mode === "battle") {
-        // === 戰鬥模式 ===
         const enemy = gameState.enemy || { name: "???", hp: 0, maxHp: 0, emoji: "❓" };
+        topSection = `<div class="battle-box"><div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div><div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}</div>`;
         
-        topSection = `
-            <div class="battle-box">
-                <div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div>
-                <div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>
-                ${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}
-            </div>
-        `;
-
-        // === 這裡使用了 SKILLS，所以 import 不會變灰 ===
-        let skillBtns = "";
-        // 普攻按鈕 (改用 handleCombat)
-        skillBtns += `<button onclick="handleCombat('attack')" style="border:1px solid #f1c40f;">⚔ 普攻</button>`;
-        
-        // 職業技能按鈕
+        let skillBtns = `<button onclick="handleCombat('attack')" style="border:1px solid #f1c40f;">⚔ 普攻</button>`;
         if (player.equippedSkills) {
             player.equippedSkills.forEach(skillId => {
                 const skillData = SKILLS.find(s => s.id === skillId);
                 if (skillData) {
                     const disabled = player.mp < skillData.cost ? "disabled" : "";
                     const costInfo = `${skillData.cost} ${skillData.costType === 'mp' ? 'MP' : '體'}`;
-                    skillBtns += `<button onclick="handleCombat('skill', '${skillId}')" ${disabled}>
-                        ${skillData.name}<br><small style="font-size:10px">(${costInfo})</small>
-                    </button>`;
+                    skillBtns += `<button onclick="handleCombat('skill', '${skillId}')" ${disabled}>${skillData.name}<br><small style="font-size:10px">(${costInfo})</small></button>`;
                 }
             });
         }
-
-        actionButtons = `
-            <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                ${skillBtns}
-            </div>
-            <div style="margin-top:5px;">
-                <button onclick="handleCombat('run')" style="width:100%; background:#555;">🏃‍♂️ 逃跑</button>
-            </div>
-        `;
+        actionButtons = `<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">${skillBtns}</div><div style="margin-top:5px;"><button onclick="handleCombat('run')" style="width:100%; background:#555;">🏃‍♂️ 逃跑</button></div>`;
         
-        document.getElementById("actions").style.display = "none";
+        const act = document.getElementById("actions");
+        if(act) act.style.display = "none";
 
     } else if (gameState.mode === "merchant") {
-        // === 商人模式 ===
-        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>流浪商人</h3></div>`;
+        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>流浪商人</h3><p>「看看有什麼需要的？」</p></div>`;
         let goodsHtml = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">`;
         gameState.merchantGoods.forEach((g, i) => {
             goodsHtml += `<button onclick="buyItem(${i})" style="font-size:14px;">${g.emoji} ${g.name}<br><span style="color:#f1c40f">${g.price} G</span></button>`;
         });
         goodsHtml += `</div>`;
         actionButtons = `${goodsHtml}<div style="margin-top:10px; text-align:center;"><button onclick="sellAllMaterials()">出售所有素材</button><button onclick="closeMerchant()">離開商人</button></div>`;
-        document.getElementById("actions").style.display = "none";
+        const act = document.getElementById("actions");
+        if(act) act.style.display = "none";
 
     } else {
-        // === 探索模式 ===
+        // Normal Mode
         const icon = gameState.enemy ? gameState.enemy.emoji : "⛺"; 
         const title = gameState.enemy ? gameState.enemy.name : "探索中...";
         topSection = `<div style="text-align:center; margin-bottom:10px; opacity: 0.8;"><div style="font-size: 60px;">${icon}</div><div style="font-size: 18px; font-weight:bold;">${title}</div></div>`;
         
-        // 強制顯示下方按鈕
         const actionsDiv = document.getElementById("actions");
-        actionsDiv.style.display = "block";
-        // 如果按鈕是空的，重新生成
-        if (actionsDiv.innerHTML.trim() === "") {
-            showMainActions();
+        if (actionsDiv) {
+            actionsDiv.style.display = "block";
+            // 這裡強制確保按鈕存在，避免因為切換模式而消失
+            if (actionsDiv.innerHTML.trim() === "") {
+                actionsDiv.innerHTML = `
+                    <button onclick="exploreNearby()">附近搜索（10s）</button>
+                    <button onclick="exploreDungeon()">地下城（20s）</button>
+                    <button onclick="exploreExpedition()">遠征（45s）</button>
+                    <button onclick="rest()">休息（10s）</button>
+                `;
+            }
         }
     }
 
@@ -128,13 +99,10 @@ export function renderMainScreen() {
 export function triggerShake() {
     const box = document.getElementById("eventBox");
     box.classList.remove("shake");
-    void box.offsetWidth; 
-    box.classList.add("shake");
+    void box.offsetWidth; box.classList.add("shake");
 }
 
-// ==========================================
-// 裝備與背包
-// ==========================================
+// Inventory & Status
 function getStatsString(stats) {
     if (!stats) return "";
     let arr = [];
@@ -178,7 +146,6 @@ export function updateStatus() {
         ${createBar("MP", "💧", player.mp, player.maxMP, "blue-bar")}
         ${createBar("飢餓", "🍗", player.hunger, player.hungerMax, "yellow-bar")}
         ${createBar("體力", "⚡", player.energy, player.energyMax, "green-bar")}
-        
         <div class="small-label">物理攻擊：${Math.floor(player.atk)}</div>
         <div class="small-label">魔法攻擊：${Math.floor(player.magicAtk)}</div>
         <div class="small-label">物理防禦：${Math.floor(player.def)}</div>
@@ -229,23 +196,19 @@ export function updateInventory() {
     });
 }
 
-// ==========================================
-// 按鈕區
-// ==========================================
+// 簡化版：只負責顯示容器，內容由 renderMainScreen 負責
 export function showMainActions() {
-    if (!player.alive || gameState.inBattle || !gameState.canAct || gameState.merchantActive) return;
-    document.getElementById("actions").innerHTML = `
-        <button onclick="exploreNearby()">附近搜索（10s）</button>
-        <button onclick="exploreDungeon()">地下城（20s）</button>
-        <button onclick="exploreExpedition()">遠征（45s）</button>
-        <button onclick="rest()">休息（10s）</button>
-    `;
-    document.getElementById("actions").style.display = "block";
+    const act = document.getElementById("actions");
+    if (act) {
+        act.style.display = "block";
+        // 這裡不用再塞 HTML 了，renderMainScreen 會做
+    }
 }
 
 export function updateCooldownButtons(t) {
-    if(document.getElementById("actions").style.display !== "none") {
-       document.getElementById("actions").innerHTML = `
+    const act = document.getElementById("actions");
+    if(act && act.style.display !== "none") {
+       act.innerHTML = `
         <button disabled>附近搜索 (${t}s)</button>
         <button disabled>地下城 (${t}s)</button>
         <button disabled>遠征 (${t}s)</button>

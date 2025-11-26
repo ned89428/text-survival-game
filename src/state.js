@@ -1,6 +1,6 @@
 // src/state.js
 
-// 玩家資料
+// 1. 玩家資料
 export let player = {
     name: "",
     job: "",
@@ -10,8 +10,10 @@ export let player = {
     expToLevel: 100,
     attrPoints: 0,
 
+    // 基礎屬性
     str: 0, agi: 0, con: 0, int: 0,
 
+    // 裝備欄位
     equipment: {
         head: null,
         body: null,
@@ -19,11 +21,17 @@ export let player = {
         accessory: null
     },
 
+    // 技能欄位
+    learnedSkills: [],
+    equippedSkills: [],
+
+    // 衍生屬性
     hp: 100, maxHP: 100,
     mp: 10,  maxMP: 10,
     hunger: 100, hungerMax: 100,
     energy: 100, energyMax: 100,
 
+    // 戰鬥屬性
     atk: 5, magicAtk: 0, def: 0, 
     dodge: 5, hitRate: 90, speed: 5, critChance: 5,
 
@@ -32,18 +40,26 @@ export let player = {
     alive: true
 };
 
-// 遊戲全域變數
+// 2. 遊戲全域狀態
 export let gameState = {
-    mode: "normal",     
-    logs: [],           
+    mode: "normal",       // normal, battle, merchant
+    logs: [],             // 統一 Log
     enemy: null,
     inBattle: false,
+    
+    // 戰鬥鎖定 (防止連點)
+    isProcessingTurn: false,
+
+    // 行動控制
     canAct: true,
     cooldownTimerId: null,
+    
+    // 商人狀態
     merchantActive: false,
     merchantGoods: []
 };
 
+// 3. 統計數據
 export let stats = {
     kills: 0,
     exploredNearby: 0,
@@ -51,8 +67,10 @@ export let stats = {
     exploredExpedition: 0
 };
 
+// 4. 背包
 export let inventory = [];
 
+// 5. 冷卻時間設定 (測試用 0，正式版請改回秒數)
 export const COOLDOWNS = {
     NEARBY: 0,      
     DUNGEON: 0,     
@@ -60,6 +78,7 @@ export const COOLDOWNS = {
     REST: 0         
 };
 
+// 工具：狀態加成計算
 function applyStateBonuses() {
     if (player.state === "祝福") {
         player.atk += 5;
@@ -75,6 +94,7 @@ function applyStateBonuses() {
     }
 }
 
+// 核心：數值計算公式
 export function recalcDerivedStats() {
     let effStr = player.str;
     let effAgi = player.agi;
@@ -155,23 +175,27 @@ export function recalcDerivedStats() {
 }
 
 // ==========================================
-// 重置遊戲資料 (關鍵修正)
+// 重置遊戲資料 (Clean Reset)
 // ==========================================
 export function resetGameData() {
-    // 1. 🚨 關鍵：如果舊遊戲有計時器在跑，強制停止它！
+    // 1. 強制殺死舊計時器
     if (gameState.cooldownTimerId) {
         clearInterval(gameState.cooldownTimerId);
         gameState.cooldownTimerId = null;
     }
 
-    // 2. 重置玩家
-    player.name = ""; player.job = ""; player.day = 1;
-    player.level = 1; player.exp = 0; player.expToLevel = 100;
+    // 2. 重置玩家數值
+    player.name = ""; 
+    player.job = ""; 
+    player.day = 1;
+    player.level = 1; 
+    player.exp = 0; 
+    player.expToLevel = 100;
     player.attrPoints = 0;
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0;
     
+    // 清空裝備與技能
     player.equipment = { head: null, body: null, weapon: null, accessory: null };
-    // 技能也要清空
     player.learnedSkills = [];
     player.equippedSkills = [];
 
@@ -184,19 +208,26 @@ export function resetGameData() {
     player.dodge = 0; player.hitRate = 80;
     player.speed = 5; player.critChance = 5;
     
-    player.gold = 0; player.state = "正常"; player.alive = true;
+    player.gold = 0; 
+    player.state = "正常"; 
+    player.alive = true;
 
-    // 3. 重置遊戲狀態
+    // 3. 重置遊戲狀態 (確保所有 Flag 回歸預設值)
     gameState.mode = "normal";
     gameState.logs = [];
     gameState.enemy = null;
     gameState.inBattle = false;
-    gameState.lastBattleText = "";
-    gameState.canAct = true; // 確保重置後可以行動
+    gameState.isProcessingTurn = false; // 解鎖戰鬥
+    gameState.canAct = true;            // 解鎖行動
     gameState.merchantActive = false;
     gameState.merchantGoods = [];
     
+    // 4. 清空陣列
     inventory.length = 0;
-    stats.kills = 0; stats.exploredNearby = 0; 
-    stats.exploredDungeon = 0; stats.exploredExpedition = 0;
+    
+    // 5. 重置統計
+    stats.kills = 0; 
+    stats.exploredNearby = 0; 
+    stats.exploredDungeon = 0; 
+    stats.exploredExpedition = 0;
 }
