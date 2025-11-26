@@ -1,28 +1,40 @@
 import { player, gameState, inventory, recalcDerivedStats } from './state.js';
 import { SKILLS } from './data/skills.js';
 
-// Helper
+// 狀態條 Helper
 function createBar(label, emoji, current, max, colorClass) {
     const pct = max > 0 ? Math.max(0, Math.min(100, (current / max * 100))) : 0;
-    return `<div class="stat-bar-wrap"><span class="small-label">${emoji} ${label}：${Math.floor(current)}/${Math.floor(max)}</span><div class="bar"><div class="bar-inner ${colorClass}" style="width:${pct}%;"></div></div></div>`;
+    return `
+        <div class="stat-bar-wrap">
+            <span class="small-label">${emoji} ${label}：${Math.floor(current)}/${Math.floor(max)}</span>
+            <div class="bar">
+                <div class="bar-inner ${colorClass}" style="width:${pct}%;"></div>
+            </div>
+        </div>
+    `;
 }
 
-// Log System
+// ==========================================
+// 統一的 Log 系統
+// ==========================================
 export function addLog(text, colorClass = "") {
     if (!gameState.logs) gameState.logs = [];
     gameState.logs.push({ text, color: colorClass });
     if (gameState.logs.length > 30) gameState.logs.shift();
     renderMainScreen();
 }
+
 export function writeEvent(text) { addLog(text.replace(/<[^>]*>/g, ""), ""); }
 export function addBattleLog(text, color) { addLog(text, color); }
 
-// Main Render
+// ==========================================
+// 核心：主畫面渲染
+// ==========================================
 export function renderMainScreen() {
     const box = document.getElementById("eventBox");
     if (!box) return; 
     
-    // Log
+    // 1. Log
     let logHtml = "";
     if (gameState.logs && gameState.logs.length > 0) {
         gameState.logs.forEach(log => {
@@ -35,14 +47,21 @@ export function renderMainScreen() {
     } else { logHtml = `<div style="opacity:0.5">日誌是空的...</div>`; }
     const logSection = `<div class="mini-log">${logHtml}</div>`;
 
-    // Top & Actions
+    // 2. Top Section
     let topSection = "";
     let actionButtons = ""; 
 
     if (gameState.mode === "battle") {
         const enemy = gameState.enemy || { name: "???", hp: 0, maxHp: 0, emoji: "❓" };
-        topSection = `<div class="battle-box"><div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div><div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}</div>`;
+        topSection = `
+            <div class="battle-box">
+                <div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div>
+                <div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>
+                ${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}
+            </div>
+        `;
         
+        // 技能按鈕
         let skillBtns = `<button onclick="handleCombat('attack')" style="border:1px solid #f1c40f;">⚔ 普攻</button>`;
         if (player.equippedSkills) {
             player.equippedSkills.forEach(skillId => {
@@ -54,8 +73,21 @@ export function renderMainScreen() {
                 }
             });
         }
-        actionButtons = `<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">${skillBtns}</div><div style="margin-top:5px;"><button onclick="handleCombat('run')" style="width:100%; background:#555;">🏃‍♂️ 逃跑</button></div>`;
+        // 戰鬥鎖定
+        const lock = gameState.isProcessingTurn ? "disabled" : "";
+        // 如果正在跑回合，重新覆蓋上面的按鈕並加上 disabled (簡易處理)
+        // 這裡為了簡化，依賴 handleCombat 內部的鎖定檢查，UI 上不做全按鈕變灰，
+        // 或是你可以把上面生成的字串 replace 一下。
+        // 這裡維持原本設計，只依賴 renderMainScreen 被呼叫時的狀態。
         
+        actionButtons = `
+            <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                ${skillBtns}
+            </div>
+            <div style="margin-top:5px;">
+                <button onclick="handleCombat('run')" style="width:100%; background:#555;">🏃‍♂️ 逃跑</button>
+            </div>
+        `;
         const act = document.getElementById("actions");
         if(act) act.style.display = "none";
 
@@ -71,7 +103,6 @@ export function renderMainScreen() {
         if(act) act.style.display = "none";
 
     } else {
-        // Normal Mode
         const icon = gameState.enemy ? gameState.enemy.emoji : "⛺"; 
         const title = gameState.enemy ? gameState.enemy.name : "探索中...";
         topSection = `<div style="text-align:center; margin-bottom:10px; opacity: 0.8;"><div style="font-size: 60px;">${icon}</div><div style="font-size: 18px; font-weight:bold;">${title}</div></div>`;
@@ -79,15 +110,7 @@ export function renderMainScreen() {
         const actionsDiv = document.getElementById("actions");
         if (actionsDiv) {
             actionsDiv.style.display = "block";
-            // 這裡強制確保按鈕存在，避免因為切換模式而消失
-            if (actionsDiv.innerHTML.trim() === "") {
-                actionsDiv.innerHTML = `
-                    <button onclick="exploreNearby()">附近搜索（10s）</button>
-                    <button onclick="exploreDungeon()">地下城（20s）</button>
-                    <button onclick="exploreExpedition()">遠征（45s）</button>
-                    <button onclick="rest()">休息（10s）</button>
-                `;
-            }
+            if (actionsDiv.innerHTML.trim() === "") showMainActions();
         }
     }
 
@@ -102,7 +125,9 @@ export function triggerShake() {
     void box.offsetWidth; box.classList.add("shake");
 }
 
-// Inventory & Status
+// ==========================================
+// 裝備與背包
+// ==========================================
 function getStatsString(stats) {
     if (!stats) return "";
     let arr = [];
@@ -161,6 +186,9 @@ export function updateStatus() {
     `;
 }
 
+// === 這裡修正了 updateInventory，加入 countDisplay ===
+// src/ui.js 的 updateInventory 函式
+
 export function updateInventory() {
     const box = document.getElementById("inventoryBox");
     const equipHtml = renderEquipmentPanel();
@@ -177,9 +205,18 @@ export function updateInventory() {
         itemsDiv.innerHTML = `<div style="opacity:0.7; padding:10px;">（背包是空的）</div>`;
         return;
     }
+    
     inventory.forEach((item, i) => {
         let actionBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
-        let sellBtn = (gameState.merchantActive && item.sellPrice) ? `<button onclick="sellOneItem(${i})">賣出 (${item.sellPrice}G)</button>` : "";
+        
+        // === 修改這裡：按鈕文字加上 "1個" ===
+        let sellBtn = (gameState.merchantActive && item.sellPrice) 
+            ? `<button onclick="sellOneItem(${i})">賣出 1個 (${item.sellPrice}G)</button>` 
+            : "";
+            
+        let dropBtn = `<button onclick="dropItem(${i})">丟棄 1個</button>`;
+        // =================================
+
         let statsDesc = "";
         if (item.type === "equip") statsDesc = `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(item.stats)}</div>`;
         else if (item.type === "heal") statsDesc = `<div style="font-size:12px; color:#00b894; margin-top:2px;">恢復 HP ${item.value}</div>`;
@@ -187,21 +224,33 @@ export function updateInventory() {
         else if (item.type === "food") statsDesc = `<div style="font-size:12px; color:#e17055; margin-top:2px;">恢復飢餓 ${item.value}</div>`;
         else if (item.type === "material") statsDesc = `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">用於交易或製作</div>`;
 
+        let countDisplay = (item.count && item.count > 1) ? `<span style="font-weight:bold; color:#fff; margin-left:5px;">x${item.count}</span>` : "";
+
         itemsDiv.innerHTML += `
             <div class="inv-item">
-                <div style="flex:1"><div>${item.emoji} ${item.name}</div>${statsDesc}</div>
-                <div style="display:flex; align-items:center;">${actionBtn}${sellBtn}<button onclick="dropItem(${i})">丟棄</button></div>
+                <div style="flex:1">
+                    <div>${item.emoji} ${item.name} ${countDisplay}</div>
+                    ${statsDesc}
+                </div>
+                <div style="display:flex; align-items:center;">
+                    ${actionBtn}
+                    ${sellBtn}
+                    ${dropBtn} </div>
             </div>
         `;
     });
 }
 
-// 簡化版：只負責顯示容器，內容由 renderMainScreen 負責
 export function showMainActions() {
     const act = document.getElementById("actions");
     if (act) {
+        act.innerHTML = `
+            <button onclick="exploreNearby()">附近搜索（10s）</button>
+            <button onclick="exploreDungeon()">地下城（20s）</button>
+            <button onclick="exploreExpedition()">遠征（45s）</button>
+            <button onclick="rest()">休息（10s）</button>
+        `;
         act.style.display = "block";
-        // 這裡不用再塞 HTML 了，renderMainScreen 會做
     }
 }
 

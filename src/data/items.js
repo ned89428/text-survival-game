@@ -40,10 +40,9 @@ export const ITEM_PREFIXES = [
 ];
 
 // 3. 消耗品 (Consumables)
-// 修正：必須加上 usable: true，UI 才會顯示「使用」按鈕
 export const CONSUMABLES = [
-    { id: "c_food_1", name: "乾糧包", type: "food", emoji: "🍞", value: 30, price: 20, usable: true },
-    { id: "c_heal_1", name: "輕型治療藥水", type: "heal", emoji: "🧴", value: 30, price: 25, usable: true },
-    { id: "c_heal_2", name: "高級治療藥水", type: "heal", emoji: "💉", value: 80, price: 60, usable: true },
-    { id: "c_mana_1", name: "法力藥水", type: "mana", emoji: "🧪", value: 20, price: 30, usable: true }
+    { id: "c_food_1", name: "乾糧包", type: "food", emoji: "🍞", value: 30, price: 20, usable: true, stackable: true },
+    { id: "c_heal_1", name: "輕型治療藥水", type: "heal", emoji: "🧴", value: 30, price: 25, usable: true, stackable: true },
+    { id: "c_heal_2", name: "高級治療藥水", type: "heal", emoji: "💉", value: 80, price: 60, usable: true, stackable: true },
+    { id: "c_mana_1", name: "法力藥水", type: "mana", emoji: "🧪", value: 20, price: 30, usable: true, stackable: true }
 ];
