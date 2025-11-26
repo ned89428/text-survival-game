@@ -10,10 +10,8 @@ export let player = {
     expToLevel: 100,
     attrPoints: 0,
 
-    // 基礎屬性
     str: 0, agi: 0, con: 0, int: 0,
 
-    // 裝備欄位
     equipment: {
         head: null,
         body: null,
@@ -21,13 +19,11 @@ export let player = {
         accessory: null
     },
 
-    // 衍生屬性
     hp: 100, maxHP: 100,
     mp: 10,  maxMP: 10,
     hunger: 100, hungerMax: 100,
     energy: 100, energyMax: 100,
 
-    // 戰鬥屬性
     atk: 5, magicAtk: 0, def: 0, 
     dodge: 5, hitRate: 90, speed: 5, critChance: 5,
 
@@ -38,8 +34,8 @@ export let player = {
 
 // 遊戲全域變數
 export let gameState = {
-    mode: "normal",     // normal, battle, merchant
-    logs: [],           // 統一的 Log 紀錄
+    mode: "normal",     
+    logs: [],           
     enemy: null,
     inBattle: false,
     canAct: true,
@@ -48,7 +44,6 @@ export let gameState = {
     merchantGoods: []
 };
 
-// 統計數據
 export let stats = {
     kills: 0,
     exploredNearby: 0,
@@ -56,11 +51,8 @@ export let stats = {
     exploredExpedition: 0
 };
 
-// 背包
 export let inventory = [];
 
-// 冷卻時間設定 (目前維持測試用 0，若要恢復正常遊戲請改回數值)
-// 建議值: NEARBY: 10, DUNGEON: 20, EXPEDITION: 45, REST: 10
 export const COOLDOWNS = {
     NEARBY: 0,      
     DUNGEON: 0,     
@@ -68,7 +60,6 @@ export const COOLDOWNS = {
     REST: 0         
 };
 
-// 狀態加成計算
 function applyStateBonuses() {
     if (player.state === "祝福") {
         player.atk += 5;
@@ -84,23 +75,17 @@ function applyStateBonuses() {
     }
 }
 
-// ==========================================
-// 核心：重新計算衍生屬性 (含裝備加成)
-// ==========================================
 export function recalcDerivedStats() {
-    // 1. 計算「有效屬性」 (基礎點數 + 裝備加成)
     let effStr = player.str;
     let effAgi = player.agi;
     let effCon = player.con;
     let effInt = player.int;
     
-    // 裝備提供的額外攻防 (直接加在面板)
     let bonusAtk = 0;
     let bonusDef = 0;
     let bonusMagic = 0;
     let bonusHP = 0;
 
-    // 遍歷所有裝備欄位，把數值加總
     Object.values(player.equipment).forEach(item => {
         if (item) {
             effStr += (item.stats.str || 0);
@@ -115,7 +100,6 @@ export function recalcDerivedStats() {
         }
     });
 
-    // 2. 定義職業係數
     let hpMod = 10;   
     let mpMod = 5;    
     let defMod = 0.5; 
@@ -145,20 +129,17 @@ export function recalcDerivedStats() {
         player.magicAtk = effInt * 1;
     }
 
-    // 3. 加上裝備的額外面板數值
     player.atk += bonusAtk;
     player.magicAtk += bonusMagic;
     
-    // 4. 計算生存與其他屬性
     player.maxHP = 50 + (effCon * hpMod) + (player.level * 5) + bonusHP;
-    player.maxMP = 10 + (effInt * mpMod) + (player.level * 2);
+    player.maxMP = 20 + (effInt * mpMod) + (player.level * 2);
     
     player.hungerMax = 100 + effCon * 5;
     player.energyMax = 100 + effCon * 5;
 
     player.def = (effCon * defMod) + bonusDef;
 
-    // 閃避與命中
     let rawDodge = effAgi * 0.5; 
     player.dodge = Math.min(60, rawDodge); 
     player.hitRate = 80 + (effAgi * 0.5); 
@@ -173,15 +154,26 @@ export function recalcDerivedStats() {
     player.hunger = Math.min(player.hunger, player.hungerMax);
 }
 
-// 重置遊戲資料
+// ==========================================
+// 重置遊戲資料 (關鍵修正)
+// ==========================================
 export function resetGameData() {
+    // 1. 🚨 關鍵：如果舊遊戲有計時器在跑，強制停止它！
+    if (gameState.cooldownTimerId) {
+        clearInterval(gameState.cooldownTimerId);
+        gameState.cooldownTimerId = null;
+    }
+
+    // 2. 重置玩家
     player.name = ""; player.job = ""; player.day = 1;
     player.level = 1; player.exp = 0; player.expToLevel = 100;
     player.attrPoints = 0;
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0;
     
-    // 清空裝備
     player.equipment = { head: null, body: null, weapon: null, accessory: null };
+    // 技能也要清空
+    player.learnedSkills = [];
+    player.equippedSkills = [];
 
     player.hp = 100; player.maxHP = 100;
     player.mp = 10;  player.maxMP = 10;
@@ -194,13 +186,13 @@ export function resetGameData() {
     
     player.gold = 0; player.state = "正常"; player.alive = true;
 
-    // 重置 GameState (包含新的 mode 和 logs)
+    // 3. 重置遊戲狀態
     gameState.mode = "normal";
     gameState.logs = [];
     gameState.enemy = null;
     gameState.inBattle = false;
     gameState.lastBattleText = "";
-    gameState.canAct = true;
+    gameState.canAct = true; // 確保重置後可以行動
     gameState.merchantActive = false;
     gameState.merchantGoods = [];
     
@@ -208,4 +200,3 @@ export function resetGameData() {
     stats.kills = 0; stats.exploredNearby = 0; 
     stats.exploredDungeon = 0; stats.exploredExpedition = 0;
 }
-

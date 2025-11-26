@@ -297,12 +297,15 @@ button:disabled {
     border-radius: 6px;
     padding: 8px;
     
-    /* ✨ 關鍵修改：讓高度自動填滿 */
-    height: auto;        /* 取消原本寫死的 height */
-    min-height: 150px;   /* 至少要有這麼高 */
-    flex: 1;             /* 自動伸展填滿剩餘空間 */
+    /* 原本的設定維持不變 */
+    height: auto;        
+    min-height: 150px;   
+    flex: 1;             
     
-    overflow-y: auto;
+    /* ✨ 新增這一行：限制最大高度 */
+    max-height: 250px;   /* 超過 250px 就會出現捲軸，不會再把視窗撐大 */
+    
+    overflow-y: auto;    /* 確保內容溢出時顯示捲軸 */
     font-size: 14px;
     text-align: left;
     margin-top: 10px;
