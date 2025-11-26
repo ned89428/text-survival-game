@@ -305,3 +305,76 @@ button:disabled {
     margin-bottom: 4px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
+
+/* =========================================
+   📱 手機版專用樣式 (RWD) - 修正順序版
+   取代 styles.css 原本最下面的那段
+   ========================================= */
+@media (max-width: 768px) {
+    /* 1. 容器改為滿版 */
+    #container {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    /* 2. 標題縮小 */
+    #title {
+        font-size: 20px;
+        padding: 8px;
+    }
+
+    /* 3. 主區塊改為「直向排列」 */
+    #main {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* 4. 狀態欄與事件欄填滿寬度 */
+    #statusBox, #eventBox {
+        width: 100%;
+        min-height: auto;
+        box-sizing: border-box;
+    }
+
+    /* 5. 狀態欄：緊湊一點，放在最上面 (這是 HTML 的預設順序，不用改 order) */
+    #statusBox {
+        font-size: 14px;
+        padding: 10px;
+        /* 如果覺得狀態欄太長佔畫面，可以考慮縮小行高 */
+        line-height: 1.4; 
+    }
+
+    /* 6. 事件視窗：放在狀態欄下方 */
+    #eventBox {
+        /* order: -1;  <--- 這一行被刪除了！這樣它就會排在狀態欄後面 */
+        padding: 10px;
+    }
+
+    /* 7. 戰鬥畫面優化 */
+    .battle-enemy-icon {
+        font-size: 60px !important;
+        margin: 5px 0 !important;
+    }
+    /* Log 高度適中，讓手指好滑動 */
+    .mini-log {
+        height: 120px; 
+    }
+
+    /* 8. 大顆按鈕好點擊 */
+    #actions button {
+        width: 48%;
+        margin: 1%;
+        padding: 12px 5px;
+        font-size: 16px;
+    }
+
+    /* 9. 彈出視窗調整 */
+    .panel {
+        width: 90%;
+        padding: 15px;
+    }
+    .job-grid {
+        grid-template-columns: 1fr;
+    }
+}

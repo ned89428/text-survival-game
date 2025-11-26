@@ -376,44 +376,80 @@ function startBattle(zone, difficulty = 1) {
 export function attack() {
     if (!gameState.inBattle || !player.alive) return;
     const enemy = gameState.enemy;
+    
+    // 1. 命中判定
     let enemyDodge = (enemy.dodge || 0) + (enemy.lvl * 0.5); 
     let hitChance = player.hitRate - enemyDodge;
 
     if (Math.random() * 100 > hitChance) {
-        UI.addLog(`攻擊未命中！`, "log-battle");
+        UI.addBattleLog(`攻擊未命中！`, "log-battle");
         UI.triggerShake();
         enemyTurn();
         return;
     }
+
+    // 2. 傷害計算
     let dmg = 0;
     let isMagic = (player.job === "法師");
-    if (isMagic) dmg = player.magicAtk; else dmg = Math.max(1, player.atk - enemy.def);
-    if (Math.random() * 100 < player.critChance) { dmg = Math.floor(dmg * 1.5); UI.addLog("💥 暴擊！", "log-critical"); }
-    
-    dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
-    enemy.hp -= dmg; if (enemy.hp < 0) enemy.hp = 0;
+    if (isMagic) dmg = player.magicAtk;
+    else dmg = Math.max(1, player.atk - enemy.def);
 
-    UI.addLog(`你對 ${enemy.name} 造成 ${dmg} 點傷害`, "log-battle");
+    let crit = false;
+    if (Math.random() * 100 < player.critChance) {
+        dmg = Math.floor(dmg * 1.5);
+        crit = true;
+    }
+    
+    // 浮動傷害
+    dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
+    
+    // 3. 扣血與狀態更新
+    enemy.hp -= dmg;
+    if (enemy.hp < 0) enemy.hp = 0;
+
+    // === 修改這裡：顯示剩餘血量 ===
+    let msg = `你對 ${enemy.name} 造成 ${dmg} 點傷害。(${enemy.name} 剩餘 ${enemy.hp} HP)`;
+    
+    if (crit) msg = "💥 暴擊！" + msg;
+    UI.addBattleLog(msg, crit ? "log-critical" : "log-battle");
     UI.triggerShake();
 
-    if (enemy.hp <= 0) { winBattle(); return; }
+    if (enemy.hp <= 0) {
+        winBattle();
+        return;
+    }
     enemyTurn();
 }
 
 function enemyTurn() {
     if (!gameState.inBattle || !player.alive) return;
     const enemy = gameState.enemy;
+
     if (Math.random() * 100 < player.dodge) {
-        UI.addLog(`你閃避了攻擊`, "log-battle");
+        UI.addBattleLog(`你閃避了攻擊。`, "log-battle");
     } else {
         let dmg = Math.max(1, enemy.atk - player.def);
         dmg = Math.floor(dmg * (0.8 + Math.random() * 0.4));
+        
         player.hp -= dmg;
-        UI.addLog(`${enemy.name} 對你造成 ${dmg} 傷害`, "log-battle");
+        
+        // 確保血量顯示不會低於 0 (視覺上好看)
+        let displayHp = Math.max(0, Math.floor(player.hp));
+        UI.addBattleLog(`${enemy.name} 對你造成 ${dmg} 傷害。(${player.name} 剩餘 ${displayHp} HP)`, "log-battle");
+        
         UI.triggerShake();
     }
-    if (player.hp <= 0) { gameOver("戰鬥中陣亡"); return; }
-    // 這裡不需要手動 render，因為 addLog 會觸發
+
+    // === 修正重點：死亡檢查 ===
+    if (player.hp <= 0) {
+        player.hp = 0; // 強制歸零，避免負數
+        // 不再更新戰鬥畫面，直接結束遊戲
+        gameOver("戰鬥中陣亡");
+        return; 
+    }
+    
+    UI.updateStatus();
+    UI.renderBattleView();
 }
 
 export function runAway() {
@@ -545,7 +581,8 @@ export function closeMerchant() {
 
 // ================== 系統功能 ==================
 function gameOver(reason) {
-    player.alive = false; player.hp = 0;
+    player.alive = false; 
+    player.hp = 0;
     UI.updateStatus();
     // 強制清空畫面
     document.getElementById("eventBox").innerHTML = `<div style="color:red; font-size:24px; text-align:center; margin-top:20px;">💀 你已死亡</div>`;

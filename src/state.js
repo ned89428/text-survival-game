@@ -208,3 +208,4 @@ export function resetGameData() {
     stats.kills = 0; stats.exploredNearby = 0; 
     stats.exploredDungeon = 0; stats.exploredExpedition = 0;
 }
+
