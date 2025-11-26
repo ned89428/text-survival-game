@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>文字生存傳說</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="overlay">
+<div id="namePanel" class="panel">
+        <h2>歡迎來到《文字生存傳說》</h2>
+        <p>請輸入你的冒險者名字：</p>
+        <input id="nameInput" type="text" placeholder="無名冒險者">
+        <button onclick="confirmName()">確認名字</button>
+        <button onclick="loadGame()" style="background:#555; margin-top:10px;">📂 讀取舊存檔</button>
+    </div>
+
+    <div id="jobPanel" class="panel" style="display:none;">
+        <h2>選擇你的職業</h2>
+        <p>每個職業都有不同的初始屬性與成長方向。</p>
+        <div class="job-grid">
+            <div class="job-card" onclick="chooseJob('warrior')">
+                <div class="job-name">🛡️ 戰士</div>
+                <div class="job-desc">近戰坦克型，高 HP 與防禦。</div>
+            </div>
+            <div class="job-card" onclick="chooseJob('archer')">
+                <div class="job-name">🏹 弓箭手</div>
+                <div class="job-desc">高敏捷，擅長閃避與遠程攻擊。</div>
+            </div>
+            <div class="job-card" onclick="chooseJob('rogue')">
+                <div class="job-name">🗡️ 盜賊</div>
+                <div class="job-desc">身手矯健，速度快，爆擊率較高。</div>
+            </div>
+            <div class="job-card" onclick="chooseJob('mage')">
+                <div class="job-name">🔮 法師</div>
+                <div class="job-desc">高智慧，較容易找到稀有物品與暴擊。</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="deathPanel" class="panel" style="display:none;">
+        <h2>你已陣亡</h2>
+        <div id="deathSummary" style="font-size:14px; line-height:1.5;"></div>
+        <button onclick="restartGame()">重新開始</button>
+    </div>
+</div>
+
+<div id="container">
+    <div id="title">文字生存傳說 Legend of Survival</div>
+
+    <div id="main">
+        <div id="statusBox"></div>
+        <div id="eventBox">請先輸入名字與選擇職業。</div>
+    </div>
+
+    <div id="actions"></div>
+
+    <div id="inventoryBox"></div>
+
+    <div id="logBox">
+        <div class="log-title">📜 冒險日誌</div>
+        <div id="logContent"></div>
+    </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+
+
+    <div style="margin-top: 50px; text-align: center; padding-bottom: 20px; opacity: 0.6;">
+        <hr style="border-color: #333; margin-bottom: 20px;">
+        <p style="font-size: 12px; color: #888;">想重新開始冒險嗎？此動作無法復原。</p>
+        <button onclick="hardReset()" style="background: #c0392b; font-size: 14px; padding: 5px 10px;">
+            ⚠️ 刪除存檔並重新開始
+        </button>
+    </div>
+
+</div> <script type="module" src="src/main.js"></script>
+
+</body>
+</html>
