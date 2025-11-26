@@ -42,10 +42,14 @@ body {
     background: #333;
     padding: 15px;
     border-radius: 10px;
-    min-height: 320px;
+    min-height: 450px; /* ⬆️原本是 320px，改高一點讓電腦版視野更好 */
     box-shadow: 0 0 10px #000;
     font-size: 18px;
     line-height: 1.6;
+    
+    /* ✨ 新增這兩行：開啟彈性排版 */
+    display: flex;
+    flex-direction: column;
 }
 
 #actions {
@@ -292,13 +296,17 @@ button:disabled {
     border: 1px solid #555;
     border-radius: 6px;
     padding: 8px;
-    height: 150px;       /* 改高一點，原本是 110px */
+    
+    /* ✨ 關鍵修改：讓高度自動填滿 */
+    height: auto;        /* 取消原本寫死的 height */
+    min-height: 150px;   /* 至少要有這麼高 */
+    flex: 1;             /* 自動伸展填滿剩餘空間 */
+    
     overflow-y: auto;
     font-size: 14px;
     text-align: left;
     margin-top: 10px;
     margin-bottom: 10px;
-    /* 記得不要加 flex-direction: column-reverse */
 }
 
 .mini-log div {
@@ -348,6 +356,7 @@ button:disabled {
     /* 6. 事件視窗：放在狀態欄下方 */
     #eventBox {
         /* order: -1;  <--- 這一行被刪除了！這樣它就會排在狀態欄後面 */
+        min-height: auto; /* 手機版高度自動 */
         padding: 10px;
     }
 
@@ -358,7 +367,8 @@ button:disabled {
     }
     /* Log 高度適中，讓手指好滑動 */
     .mini-log {
-        height: 120px; 
+        height: 150px; 
+        flex: none;
     }
 
     /* 8. 大顆按鈕好點擊 */
