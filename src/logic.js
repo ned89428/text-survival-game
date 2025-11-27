@@ -66,18 +66,6 @@ export function addAttr(type) {
 export function advanceDay() { 
     player.day++; 
     UI.updateStatus();
-    
-    // Boss 事件檢查
-    if (player.day === 10) {
-        UI.addLog("🛑 遠處傳來沉重的腳步聲...半獸人隊長找上門了！", "log-critical");
-        setTimeout(() => startBossBattle("boss_orc"), 1500);
-    } 
-    else if (player.day === 20) {
-        UI.addLog("🛑 天空變暗，巨大的陰影籠罩大地...遠古巨龍降臨！", "log-critical");
-        setTimeout(() => startBossBattle("boss_dragon"), 1500);
-    }
-    
-    autoSave();
 }
 export function addExp(amount) {
     player.exp += amount;
