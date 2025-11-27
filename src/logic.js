@@ -44,16 +44,21 @@ export function checkSaveAndStart() {
         gameState.canAct = true;
         gameState.cooldownTimerId = null;
 
+        // 商人防呆
         if (gameState.mode === 'merchant' && (!gameState.merchantGoods || gameState.merchantGoods.length === 0)) {
             gameState.mode = 'normal';
             gameState.merchantActive = false;
         }
+        // 戰鬥防呆
+        if (gameState.mode === 'battle' && !gameState.enemy) {
+            gameState.mode = 'normal';
+            gameState.inBattle = false;
+        }
+        // 正常模式防呆
         if (gameState.mode === 'normal') {
             gameState.inBattle = false;
             gameState.enemy = null;
-        } else if (gameState.mode === 'battle') {
-            if (!gameState.enemy) gameState.mode = 'normal';
-            else gameState.inBattle = true;
+            gameState.merchantActive = false;
         }
 
         if (!player.alive) { handlePlayerDeath("歷史紀錄 (已死亡)", true); return; }
@@ -61,8 +66,10 @@ export function checkSaveAndStart() {
         UI.updateStatus(); UI.updateInventory(); UI.updateStash();
         document.getElementById("overlay").style.display = "none";
         UI.addLog(`歡迎回來，${player.name}。繼續你的第 ${player.day} 天冒險。`, "log-system");
+        
+        // 🚀 修正：只呼叫 renderMainScreen，它會自己判斷要不要顯示按鈕
         UI.renderMainScreen();
-        UI.showMainActions();
+        
     } catch (e) { console.error("存檔損壞", e); document.getElementById("overlay").style.display = "flex"; }
 }
 
@@ -203,6 +210,7 @@ export function dropItem(i) { const item = inventory[i]; UI.addLog(`丟棄了 ${
 
 
 // ================== 商人系統 ==================
+
 function maybeMerchant(from) {
     if (gameState.inBattle || gameState.merchantActive) return false;
     let chance = from === "nearby" ? 0.05 : from === "dungeon" ? 0.1 : 0.08;
@@ -224,6 +232,36 @@ function openMerchant() {
     UI.addLog("遇到了流浪商人");
 }
 
+export function buyItem(index) {
+    const item = gameState.merchantGoods[index];
+    if (!item || typeof item.price !== 'number') return;
+    if (player.gold < item.price) { UI.addLog(`金錢不足，你需要 ${item.price} G`, "log-system"); return; }
+    player.gold -= item.price; 
+    addToInventory({ ...item });
+    UI.updateStatus(); UI.updateInventory(); UI.addLog(`購買了 ${item.name}`, "log-system");
+    renderMerchantUI(`感謝購買！已獲得 ${item.name}。`); autoSave();
+}
+
+export function sellAllMaterials() {
+    let total = 0;
+    for(let i = inventory.length - 1; i >= 0; i--){
+        if (inventory[i].type === "material" && inventory[i].sellPrice) {
+            total += inventory[i].sellPrice; inventory.splice(i, 1);
+        }
+    }
+    if (total > 0) { player.gold += total; UI.updateStatus(); UI.updateInventory(); UI.addLog(`出售素材獲得 ${total} G`, "log-system"); autoSave(); } 
+    else { UI.addLog("沒有素材可賣", "log-system"); }
+}
+
+// 👇👇👇 你原本可能漏掉或沒 export 這個 👇👇👇
+export function closeMerchant() {
+    gameState.merchantActive = false; 
+    gameState.merchantGoods = []; 
+    gameState.mode = "normal"; // 切回正常模式
+    UI.addLog("結束交易"); 
+    UI.updateInventory(); 
+    UI.showMainActions(); // 顯示下方按鈕
+}
 
 // ================== 探索與戰鬥系統 ==================
 function startCooldown(seconds) {
@@ -611,49 +649,75 @@ export function confirmDefeat() {
     autoSave();
 }
 
+// src/logic.js 的 rest 函式 (安全休息版)
+
 export function rest() {
     if (!gameState.canAct || !player.alive || gameState.inBattle || gameState.merchantActive) return;
     
+    // 檢查飢餓
     let hungerCost = 20;
     let isStarving = player.hunger < hungerCost;
 
-    UI.addLog("😴 你決定稍作休息……");
+    UI.addLog("😴 你回到安全的旅店休息……");
     startCooldown(COOLDOWNS.REST);
     
     setTimeout(() => {
         if (!player.alive) return;
         
         try {
-            if (isStarving) {
-                player.hunger = 0; player.hp -= 10;
-                UI.addLog("⚠️ 肚子太餓了，睡得不好... (HP -10)", "log-critical");
-            } else { player.hunger -= hungerCost; }
+            let hpChange = 0;
 
-            const r = Math.random();
-            if (r < 0.2) {
-                startBattle("nearby", 1);
-                UI.addLog("休息時遭到偷襲！", "log-battle");
-            } else if (r < 0.3) {
-                const dmg = 15; player.hp -= dmg; player.state = "中毒";
-                UI.addLog(`中毒！受到 ${dmg} 傷害`, "log-critical");
-                if (player.hp <= 0) handlePlayerDeath("休息時遭毒害");
-                UI.updateStatus();
-            } else {
-                let healHP = 20 + player.con * 2; let healMP = 10 + player.int * 2; let healEnergy = 25 + player.con * 2;
-                if (isStarving) { healHP = Math.floor(healHP / 2); healMP = Math.floor(healMP / 2); healEnergy = Math.floor(healEnergy / 2); }
-                player.hp = Math.min(player.maxHP, player.hp + healHP);
-                player.mp = Math.min(player.maxMP, player.mp + healMP);
-                player.energy = Math.min(player.energyMax, player.energy + healEnergy);
-                addExp(5);
-                UI.addLog(`休息後恢復了體力與傷口`);
+            // 1. 飢餓判定 (餓肚子會扣血，但不致死，因為後面會補回來)
+            if (isStarving) {
+                player.hunger = 0; 
+                hpChange -= 10; 
+                UI.addLog("⚠️ 肚子太餓了，睡得不好... (HP -10)", "log-critical");
+            } else { 
+                player.hunger -= hungerCost; 
             }
+
+            // 2. 移除偷襲事件 (城鎮休息是絕對安全的)
+            // (原本這裡有的 startBattle 代碼已刪除)
+
+            // 3. 計算恢復量
+            // 基礎恢復量
+            let healHP = 20 + player.con * 2; 
+            let healMP = 10 + player.int * 2; 
+            let healEnergy = 25 + player.con * 2;
+
+            // 如果飢餓，恢復效果減半
+            if (isStarving) { 
+                healHP = Math.floor(healHP / 2); 
+                healMP = Math.floor(healMP / 2); 
+                healEnergy = Math.floor(healEnergy / 2); 
+            }
+
+            // 4. 結算 HP (先扣飢餓傷，再補血，確保淨值是正的)
+            // 例如：飢餓(-10) + 補血(+20) = 實際 +10，這樣就不會死了
+            hpChange += healHP;
+
+            player.hp = Math.min(player.maxHP, player.hp + hpChange);
+            player.mp = Math.min(player.maxMP, player.mp + healMP);
+            player.energy = Math.min(player.energyMax, player.energy + healEnergy);
+
+            // 5. ✨ 關鍵修正：解除負面狀態 ✨
+            if (player.state === "中毒" || player.state === "重傷") {
+                player.state = "正常";
+                UI.addLog("✨ 經過休息，你的身體狀況恢復了正常。", "log-system");
+            }
+
+            addExp(5);
+            UI.addLog(`休息後恢復了體力與傷口`);
             
+            // 推進天數
             advanceDay();
             UI.updateStatus();
             
+            // 刷新畫面
             if (!gameState.inBattle) UI.renderMainScreen();
             
             autoSave();
+
         } catch (e) {
             console.error("休息邏輯錯誤", e);
             UI.addLog(`❌ 休息時發生錯誤: ${e.message}`, "log-critical");

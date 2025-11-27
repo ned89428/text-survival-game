@@ -22,6 +22,7 @@ export function renderMainScreen() {
     const box = document.getElementById("eventBox");
     if (!box) return; 
     
+    // 1. Log
     let logHtml = "";
     if (gameState.logs && gameState.logs.length > 0) {
         gameState.logs.forEach(log => {
@@ -34,14 +35,16 @@ export function renderMainScreen() {
     } else { logHtml = `<div style="opacity:0.5">日誌是空的...</div>`; }
     const logSection = `<div class="mini-log">${logHtml}</div>`;
 
+    // 2. Top Section & Buttons
     let topSection = "";
     let actionButtons = ""; 
     const actionsDiv = document.getElementById("actions");
-    if (actionsDiv) actionsDiv.style.display = "none";
+    if (actionsDiv) actionsDiv.style.display = "none"; // 預設隱藏，由下面邏輯決定是否開啟
 
     if (gameState.mode === "battle") {
         const enemy = gameState.enemy || { name: "???", hp: 0, maxHp: 0, emoji: "❓" };
         const globalLock = gameState.isProcessingTurn ? "disabled" : "";
+        
         topSection = `<div class="battle-box"><div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div><div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}</div>`;
         
         let skillBtns = `<button onclick="handleCombat('attack')" style="border:1px solid #f1c40f;" ${globalLock}>⚔ 普攻</button>`;
@@ -56,6 +59,10 @@ export function renderMainScreen() {
             });
         }
         actionButtons = `<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">${skillBtns}</div><div style="margin-top:5px;"><button onclick="handleCombat('run')" style="width:100%; background:#555;" ${globalLock}>🏃‍♂️ 逃跑</button></div>`;
+        
+        // 戰鬥中隱藏倉庫
+        const stashBox = document.getElementById("stashBox");
+        if(stashBox) stashBox.style.display = "none";
 
     } else if (gameState.mode === "merchant") {
         topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>流浪商人</h3><p>「看看有什麼需要的？」</p></div>`;
@@ -65,18 +72,30 @@ export function renderMainScreen() {
         });
         goodsHtml += `</div>`;
         actionButtons = `${goodsHtml}<div style="margin-top:10px; text-align:center;"><button onclick="sellAllMaterials()">出售所有素材</button><button onclick="closeMerchant()">離開商人</button></div>`;
+        
+        // 商人模式隱藏倉庫
+        const stashBox = document.getElementById("stashBox");
+        if(stashBox) stashBox.style.display = "none";
 
     } else {
+        // === 正常模式 ===
         const icon = gameState.enemy ? gameState.enemy.emoji : "⛺"; 
         const title = gameState.enemy ? gameState.enemy.name : "探索中...";
         topSection = `<div style="text-align:center; margin-bottom:10px; opacity: 0.8;"><div style="font-size: 60px;">${icon}</div><div style="font-size: 18px; font-weight:bold;">${title}</div></div>`;
-        if (actionsDiv) { actionsDiv.style.display = "block"; if (actionsDiv.innerHTML.trim() === "") showMainActions(); }
+        
+        if (actionsDiv) {
+            actionsDiv.style.display = "block";
+            if (actionsDiv.innerHTML.trim() === "") showMainActions();
+        }
     }
 
     box.innerHTML = `${topSection}${logSection}${actionButtons}`;
     const logDiv = box.querySelector(".mini-log");
     if(logDiv) logDiv.scrollTop = logDiv.scrollHeight;
-    updateInventory(); updateStash();
+    
+    // 3. 渲染背包與倉庫
+    updateInventory(); 
+    updateStash();
 }
 
 export function triggerShake() {
@@ -85,7 +104,7 @@ export function triggerShake() {
     void box.offsetWidth; box.classList.add("shake");
 }
 
-// Stats Helper
+// Inventory & Stash Helpers
 function getStatsString(stats) {
     if (!stats) return "";
     let arr = [];
@@ -114,11 +133,9 @@ function renderEquipmentPanel() {
     return html;
 }
 
-// === ✨ 核心修改：狀態更新拆分為 TopBar 與 StatusBox ✨ ===
 export function updateStatus() {
     recalcDerivedStats(); 
-    
-    // 1. 更新頂部資訊列
+    // TopBar
     const topBar = document.getElementById("topBar");
     if (topBar) {
         topBar.innerHTML = `
@@ -128,8 +145,7 @@ export function updateStatus() {
             <div class="top-item"><span class="top-label">🚩 狀態：</span> ${player.state}</div>
         `;
     }
-    
-    // 2. 更新左側狀態欄 (只放條條和屬性)
+    // StatusBox
     const statusBox = document.getElementById("statusBox");
     if (statusBox) {
         statusBox.innerHTML = `
@@ -138,7 +154,6 @@ export function updateStatus() {
             ${createBar("MP", "💧", player.mp, player.maxMP, "blue-bar")}
             ${createBar("飢餓", "🍗", player.hunger, player.hungerMax, "yellow-bar")}
             ${createBar("體力", "⚡", player.energy, player.energyMax, "green-bar")}
-            
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
                 <div class="small-label">物理攻擊：${Math.floor(player.atk)}</div>
                 <div class="small-label">魔法攻擊：${Math.floor(player.magicAtk)}</div>
@@ -147,7 +162,6 @@ export function updateStatus() {
                 <div class="small-label">閃避率：${player.dodge.toFixed(1)}%</div>
                 <div class="small-label">速度：${player.speed.toFixed(1)}</div>
             </div>
-
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
                 <div class="small-label" style="color:#f1c40f;">剩餘點數：${player.attrPoints}</div>
                 <div class="attr-line">STR 力量：${player.str} ${player.attrPoints > 0 ? `<button onclick="addAttr('str')">+</button>` : ""}</div>
@@ -158,8 +172,6 @@ export function updateStatus() {
         `;
     }
 }
-
-// src/ui.js 的 updateInventory 函式
 
 export function updateInventory() {
     const box = document.getElementById("inventoryBox");
@@ -178,16 +190,13 @@ export function updateInventory() {
     } else {
         inventory.forEach((item, i) => {
             let actionBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
-            
-            // 賣出按鈕
             let sellBtn = (gameState.merchantActive && item.sellPrice) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${item.sellPrice}G)</button>` : "";
             
-            // ✨ 修正這裡：加回存入按鈕 ✨
-            // 只有在正常模式 (非戰鬥、非商人) 才顯示存入
+            // ✨ 存入按鈕：只有在正常模式顯示
             let storeBtn = (gameState.mode === 'normal' && !gameState.merchantActive && !gameState.inBattle) 
                 ? `<button onclick="moveToStash(${i})" style="color:#f39c12; border-color:#f39c12;">存入</button>` 
                 : "";
-
+            
             let dropBtn = `<button onclick="dropItem(${i})">丟棄 1個</button>`;
 
             let statsDesc = "";
@@ -201,27 +210,22 @@ export function updateInventory() {
 
             itemsDiv.innerHTML += `
                 <div class="inv-item">
-                    <div style="flex:1">
-                        <div>${item.emoji} ${item.name} ${countDisplay}</div>
-                        ${statsDesc}
-                    </div>
-                    <div style="display:flex; align-items:center;">
-                        ${actionBtn}
-                        ${sellBtn}
-                        ${storeBtn} ${dropBtn}
-                    </div>
+                    <div style="flex:1"><div>${item.emoji} ${item.name} ${countDisplay}</div>${statsDesc}</div>
+                    <div style="display:flex; align-items:center;">${actionBtn}${sellBtn}${storeBtn}${dropBtn}</div>
                 </div>
             `;
         });
     }
-    // 順便更新倉庫顯示
-    updateStash();
 }
 
 export function updateStash() {
     const box = document.getElementById("stashBox");
     if (!box) return;
-    if (gameState.mode !== 'normal' || gameState.inBattle) { box.style.display = 'none'; return; }
+    
+    if (gameState.mode !== 'normal' || gameState.inBattle || gameState.merchantActive) { 
+        box.style.display = 'none'; 
+        return; 
+    }
     box.style.display = 'block';
 
     box.innerHTML = `<div class="inv-title" style="margin-bottom:10px; color:#3498db;">📦 倉庫（${stash.length}）</div><div class="inv-items" style="display:block;"></div>`;
