@@ -3,14 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>文字生存傳說</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div id="overlay">
-<div id="namePanel" class="panel">
+    <div id="namePanel" class="panel">
         <h2>歡迎來到《文字生存傳說》</h2>
         <p>請輸入你的冒險者名字：</p>
         <input id="nameInput" type="text" placeholder="無名冒險者">
@@ -22,54 +21,67 @@
         <p>每個職業都有不同的初始屬性與成長方向。</p>
         <div class="job-grid">
             <div class="job-card" onclick="chooseJob('warrior')">
-                <div class="job-name">🛡️ 戰士</div>
-                <div class="job-desc">近戰坦克型，高 HP 與防禦。</div>
+                <div class="job-name">🛡️ 戰士</div><div class="job-desc">近戰坦克型，高 HP 與防禦。</div>
             </div>
             <div class="job-card" onclick="chooseJob('archer')">
-                <div class="job-name">🏹 弓箭手</div>
-                <div class="job-desc">高敏捷，擅長閃避與遠程攻擊。</div>
+                <div class="job-name">🏹 弓箭手</div><div class="job-desc">高敏捷，擅長閃避與遠程攻擊。</div>
             </div>
             <div class="job-card" onclick="chooseJob('rogue')">
-                <div class="job-name">🗡️ 盜賊</div>
-                <div class="job-desc">身手矯健，速度快，爆擊率較高。</div>
+                <div class="job-name">🗡️ 盜賊</div><div class="job-desc">身手矯健，速度快，爆擊率較高。</div>
             </div>
             <div class="job-card" onclick="chooseJob('mage')">
-                <div class="job-name">🔮 法師</div>
-                <div class="job-desc">高智慧，較容易找到稀有物品與暴擊。</div>
+                <div class="job-name">🔮 法師</div><div class="job-desc">高智慧，較容易找到稀有物品與暴擊。</div>
             </div>
         </div>
     </div>
 
     <div id="deathPanel" class="panel" style="display:none;">
-        <h2>你已陣亡</h2>
-        <div id="deathSummary" style="font-size:14px; line-height:1.5;"></div>
+        <h2 style="color: #c0392b;">💀 你已陣亡</h2>
+        <p>你的冒險到此結束了... (存檔已刪除)</p>
+        <div id="deathSummary" style="font-size:14px; line-height:1.5; margin: 15px 0;"></div>
         <button onclick="restartGame()">重新開始</button>
+    </div>
+
+    <div id="defeatPanel" class="panel" style="display:none; border: 1px solid #f1c40f;">
+        <h2 style="color: #f1c40f;">🤕 重傷撤退</h2>
+        <p>你被人救回了城鎮，但身上的東西都丟光了...</p>
+        <div id="defeatSummary" style="font-size:14px; line-height:1.5; margin: 15px 0; color: #ccc;"></div>
+        <button onclick="confirmDefeat()" style="background: #f1c40f; color: #000;">甦醒</button>
     </div>
 </div>
 
 <div id="container">
     <div id="title">文字生存傳說 Legend of Survival</div>
 
-    <div id="main">
-        <div id="statusBox"></div>
-        <div id="eventBox">請先輸入名字與選擇職業。</div>
+    <div id="topBar">
+        載入中...
     </div>
 
-    <div id="actions"></div>
+    <div id="gameArea">
+        
+        <div id="statusBox"></div>
 
-    <div id="inventoryBox"></div>
-</div>
+        <div id="centerPanel">
+            <div id="eventBox">請先輸入名字與選擇職業。</div>
+            <div id="actions"></div>
+        </div>
 
-<script type="module" src="src/main.js"></script>
+        <div id="inventoryBox"></div>
+    
+    </div>
 
+    <div id="stashBox" style="display:none;"></div>
 
-    <div style="margin-top: 50px; text-align: center; padding-bottom: 20px; opacity: 0.6;">
+    <div style="margin-top: 30px; text-align: center; padding-bottom: 20px; opacity: 0.6;">
         <hr style="border-color: #333; margin-bottom: 20px;">
         <p style="font-size: 12px; color: #888;">想重新開始冒險嗎？此動作無法復原。</p>
         <button onclick="hardReset()" style="background: #c0392b; font-size: 14px; padding: 5px 10px;">
             ⚠️ 刪除存檔並重新開始
         </button>
     </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
 
 </body>
 </html>

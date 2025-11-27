@@ -3,284 +3,248 @@ body {
     color: #fff;
     font-family: "Microsoft JhengHei", sans-serif;
     padding: 20px;
+    margin: 0;
 }
 
 #container {
-    width: 960px;
+    max-width: 1200px; /* 加寬容器以容納三欄 */
     margin: auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
 }
 
 #title {
     text-align: center;
-    font-size: 28px;
+    font-size: 24px;
     padding: 10px;
     background: #292929;
-    border-radius: 10px;
+    border-radius: 8px;
     font-weight: bold;
+    letter-spacing: 2px;
 }
 
-#main {
+/* === ✨ 新增：頂部資訊列樣式 === */
+#topBar {
     display: flex;
-    gap: 20px;
+    justify-content: space-around; /* 平均分配 */
+    align-items: center;
+    background: #2c3e50;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #34495e;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 
+/* === 修改：Top Bar 樣式 (字體與顏色微調) === */
+.top-label {
+    color: #aaa; /* 標籤顏色淡一點 */
+    font-weight: normal;
+    margin-right: 5px;
+}
+.top-item {
+    font-weight: bold;
+    color: #fff;
+}
+
+/* === 修改：三欄式 Grid 佈局 (讓中間寬一點，左右固定) === */
+#gameArea {
+    display: grid;
+    grid-template-columns: 240px 1fr 320px; /* 右邊背包再加寬一點到 320px */
+    gap: 15px; /* 間距稍微拉開一點點，比較不擁擠 */
+    align-items: stretch; /* 讓三個區塊高度盡量拉伸對齊 */
+}
+
+/* 左側：狀態欄 */
 #statusBox {
-    flex: 1;
     background: #2a2a2a;
     padding: 15px;
     border-radius: 10px;
-    min-height: 320px;
-    box-shadow: 0 0 10px #000;
-    font-size: 16px;
+    box-shadow: 0 0 5px #000;
+    font-size: 15px;
 }
-
+/* === 修改：中間區塊 (讓它撐滿高度) === */
+#centerPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%; /* 撐滿高度 */
+}
 #eventBox {
-    flex: 2;
     background: #333;
     padding: 15px;
     border-radius: 10px;
-    min-height: 450px; /* ⬆️原本是 320px，改高一點讓電腦版視野更好 */
+    /* 移除 min-height，改用 flex-grow 讓它自動填滿剩餘空間 */
+    flex-grow: 1; 
+    min-height: 350px; /* 但還是保留一個最小高度 */
     box-shadow: 0 0 10px #000;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1.6;
-    
-    /* ✨ 新增這兩行：開啟彈性排版 */
     display: flex;
     flex-direction: column;
 }
 
 #actions {
     background: #292929;
-    padding: 15px;
+    padding: 10px;
     border-radius: 10px;
     text-align: center;
+    min-height: 60px; /* 避免空的時候塌陷 */
 }
 
-button {
-    padding: 8px 16px;
-    margin: 4px;
-    font-size: 16px;
-    background: #444;
-    border: none;
-    border-radius: 6px;
-    color: #fff;
-    cursor: pointer;
-}
-
-button:disabled {
-    background: #555;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
+/* === 修改：右側背包 (設定固定高度並開啟捲軸) === */
 #inventoryBox {
     background: #232323;
     padding: 15px;
     border-radius: 10px;
+    box-shadow: 0 0 5px #000;
+    /* 設定一個跟左邊/中間差不多的高度 */
+    height: 500px; 
+    overflow-y: auto; /* 內容多時顯示捲軸 */
+}
+
+/* 底部：倉庫 */
+#stashBox {
+    background: #1a2530;
+    padding: 15px;
+    border-radius: 10px;
     box-shadow: 0 0 10px #000;
+    border: 1px solid #34495e;
+    margin-top: 5px;
 }
 
-.inv-title {
-    font-size: 20px;
-    cursor: pointer;
-    margin-bottom: 10px;
-    user-select: none;
-}
-
-.inv-items {
-    display: none;
-    padding-top: 10px;
-}
-
-.inv-item {
-    background: #333;
-    padding: 8px;
-    margin-bottom: 6px;
-    border-radius: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* 通用按鈕 */
+button {
+    padding: 6px 12px;
+    margin: 3px;
     font-size: 14px;
+    background: #444;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    cursor: pointer;
+    transition: background 0.1s;
 }
 
-.inv-item button {
-    margin-left: 5px;
-    padding: 3px 8px;
-    font-size: 13px;
+button:hover {
+    background: #555;
 }
 
+button:disabled {
+    background: #333;
+    border-color: #444;
+    color: #777;
+    cursor: not-allowed;
+}
+
+/* 狀態條 */
 .stat-bar-wrap {
-    margin-top: 4px;
-    margin-bottom: 8px;
+    margin-top: 6px;
+    margin-bottom: 10px;
 }
 
 .bar {
     width: 100%;
-    height: 16px;
-    background: #444;
-    border-radius: 8px;
+    height: 14px;
+    background: #111;
+    border-radius: 7px;
     overflow: hidden;
+    border: 1px solid #444;
 }
 
-.bar-inner {
-    height: 100%;
-    border-radius: 8px;
-}
-
-.red-bar { background: #c0392b; }
+.bar-inner { height: 100%; }
+.red-bar { background: #e74c3c; }
 .yellow-bar { background: #f1c40f; }
-.green-bar { background: #27ae60; }
+.green-bar { background: #2ecc71; }
 .blue-bar { background: #3498db; }
 
-.small-label {
-    font-size: 14px;
-    opacity: 0.9;
-}
+.small-label { font-size: 12px; color: #ccc; margin-bottom: 2px; display: block; }
 
+/* 屬性 */
 .attr-line {
-    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2px;
 }
 
-.attr-line button {
-    padding: 0 6px;
-    font-size: 14px;
-}
-
-#logBox {
-    background: #232323;
-    padding: 10px 15px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px #000;
-    margin-top: 10px;
-}
-
-.log-title {
-    font-size: 18px;
-    margin-bottom: 6px;
-}
-
-#logContent {
-    max-height: 200px;
+/* Log 視窗 */
+.mini-log {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    height: auto;
+    min-height: 150px;
+    max-height: 220px;
+    flex: 1;
     overflow-y: auto;
-    font-size: 14px;
-    line-height: 1.4;
+    font-size: 13px;
+    margin: 10px 0;
 }
-
-.log-line {
-    margin-bottom: 2px;
-}
+.mini-log div { margin-bottom: 3px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .log-battle { color: #f1c40f; }
 .log-critical { color: #ff7675; }
 .log-system { color: #74b9ff; }
 
-#overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-}
-
-.panel {
-    background: #2b2b2b;
-    border-radius: 12px;
-    padding: 20px 24px;
-    box-shadow: 0 0 20px #000;
-    width: 420px;
-}
-
-.panel h2 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.panel p {
-    font-size: 14px;
-    opacity: 0.9;
-    text-align: center;
-}
-
-#nameInput {
-    width: 100%;
-    padding: 8px;
-    border-radius: 6px;
-    border: none;
-    margin-top: 10px;
-    margin-bottom: 12px;
-    font-size: 16px;
-}
-
-.panel button {
-    width: 100%;
-    margin-top: 5px;
-}
-
-#jobPanel {
-    width: 560px;
-}
-
-.job-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-top: 15px;
-}
-
-.job-card {
-    background: #333;
-    border-radius: 10px;
-    padding: 10px;
-    cursor: pointer;
-    border: 1px solid #555;
-    transition: background 0.15s, transform 0.1s, border-color 0.15s;
-}
-
-.job-card:hover {
-    background: #3d3d3d;
-    transform: translateY(-2px);
-    border-color: #f1c40f;
-}
-
-.job-name {
+/* 背包項目 */
+.inv-title {
     font-size: 18px;
-    margin-bottom: 4px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #444;
+    padding-bottom: 5px;
 }
-.job-desc {
+.inv-item {
+    background: #2c2c2c;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-size: 13px;
-    opacity: 0.9;
+}
+.inv-item button {
+    padding: 2px 6px;
+    font-size: 12px;
+    margin: 0 2px;
 }
 
-.battle-box {
-    text-align: center;
-}
-.battle-enemy-icon {
+/* 裝備欄 Grid */
+.equip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
     margin-bottom: 10px;
 }
-.battle-title {
-    font-size: 20px;
-    margin-bottom: 6px;
-}
-.battle-stats {
-    font-size: 14px;
-    margin-bottom: 10px;
-    opacity: 0.9;
-}
-.battle-text {
-    font-size: 15px;
-    margin-top: 4px;
-}
 
-/* 戰鬥震動效果 */
-.shake {
-    animation: shake 0.3s linear;
+/* 彈出視窗 */
+#overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center; z-index: 999;
 }
+.panel {
+    background: #2b2b2b; border-radius: 12px; padding: 25px;
+    box-shadow: 0 0 30px #000; width: 400px; text-align: center;
+}
+#nameInput { width: 80%; padding: 8px; margin: 15px 0; }
+.panel button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; }
 
+#jobPanel { width: 600px; }
+.job-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.job-card {
+    background: #333; padding: 15px; border-radius: 8px; cursor: pointer; border: 1px solid #555;
+}
+.job-card:hover { background: #3d3d3d; border-color: #f1c40f; }
+.job-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+.job-desc { font-size: 13px; color: #aaa; }
+
+/* 戰鬥動畫 */
+.shake { animation: shake 0.3s linear; }
 @keyframes shake {
     0% { transform: translate(0px, 0px); }
     20% { transform: translate(-4px, 0px); }
@@ -290,104 +254,21 @@ button:disabled {
     100% { transform: translate(0px, 0px); }
 }
 
-/* 修改 .mini-log */
-.mini-log {
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid #555;
-    border-radius: 6px;
-    padding: 8px;
-    
-    /* 原本的設定維持不變 */
-    height: auto;        
-    min-height: 150px;   
-    flex: 1;             
-    
-    /* ✨ 新增這一行：限制最大高度 */
-    max-height: 250px;   /* 超過 250px 就會出現捲軸，不會再把視窗撐大 */
-    
-    overflow-y: auto;    /* 確保內容溢出時顯示捲軸 */
-    font-size: 14px;
-    text-align: left;
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-
-.mini-log div {
-    margin-bottom: 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-/* =========================================
-   📱 手機版專用樣式 (RWD) - 修正順序版
-   取代 styles.css 原本最下面的那段
-   ========================================= */
-@media (max-width: 768px) {
-    /* 1. 容器改為滿版 */
-    #container {
-        width: 100%;
-        padding: 10px;
-        box-sizing: border-box;
-    }
-
-    /* 2. 標題縮小 */
-    #title {
-        font-size: 20px;
-        padding: 8px;
-    }
-
-    /* 3. 主區塊改為「直向排列」 */
-    #main {
+/* RWD: 手機版適配 */
+@media (max-width: 900px) {
+    #gameArea {
+        display: flex;
         flex-direction: column;
+    }
+    #statusBox, #centerPanel, #inventoryBox {
+        width: 100%;
+    }
+    #topBar {
+        flex-wrap: wrap;
         gap: 10px;
     }
-
-    /* 4. 狀態欄與事件欄填滿寬度 */
-    #statusBox, #eventBox {
-        width: 100%;
-        min-height: auto;
-        box-sizing: border-box;
-    }
-
-    /* 5. 狀態欄：緊湊一點，放在最上面 (這是 HTML 的預設順序，不用改 order) */
-    #statusBox {
-        font-size: 14px;
-        padding: 10px;
-        /* 如果覺得狀態欄太長佔畫面，可以考慮縮小行高 */
-        line-height: 1.4; 
-    }
-
-    /* 6. 事件視窗：放在狀態欄下方 */
-    #eventBox {
-        /* order: -1;  <--- 這一行被刪除了！這樣它就會排在狀態欄後面 */
-        min-height: auto; /* 手機版高度自動 */
-        padding: 10px;
-    }
-
-    /* 7. 戰鬥畫面優化 */
-    .battle-enemy-icon {
-        font-size: 60px !important;
-        margin: 5px 0 !important;
-    }
-    /* Log 高度適中，讓手指好滑動 */
-    .mini-log {
-        height: 150px; 
-        flex: none;
-    }
-
-    /* 8. 大顆按鈕好點擊 */
     #actions button {
         width: 48%;
-        margin: 1%;
-        padding: 12px 5px;
-        font-size: 16px;
-    }
-
-    /* 9. 彈出視窗調整 */
-    .panel {
-        width: 90%;
-        padding: 15px;
-    }
-    .job-grid {
-        grid-template-columns: 1fr;
+        padding: 12px;
     }
 }

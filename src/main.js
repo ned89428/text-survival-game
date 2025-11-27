@@ -7,7 +7,7 @@ UI.updateInventory();
 UI.addLog("歡迎來到文字生存傳說。", "log-system");
 
 // ===========================================================
-// 掛載函式到 window (讓 HTML 按鈕找得到這些功能)
+// 掛載函式到 window
 // ===========================================================
 
 // 1. 系統與存檔
@@ -15,6 +15,7 @@ window.confirmName = Game.confirmName;
 window.chooseJob = Game.chooseJob;
 window.restartGame = Game.restartGame;
 window.hardReset = Game.hardReset;
+window.confirmDefeat = Game.confirmDefeat; // 戰敗確認
 
 // 2. 屬性與背包操作
 window.addAttr = Game.addAttr;
@@ -25,16 +26,20 @@ window.dropItem = Game.dropItem;
 window.equipItem = Game.equipItem;
 window.unequipItem = Game.unequipItem;
 
-// 3. 探索行動 (這裡就是你失效的那排按鈕)
+// ✨ 補上這兩行，倉庫才能運作！ ✨
+window.moveToStash = Game.moveToStash;
+window.takeFromStash = Game.takeFromStash;
+
+// 3. 探索行動
 window.exploreNearby = Game.exploreNearby;
 window.exploreDungeon = Game.exploreDungeon;
 window.exploreExpedition = Game.exploreExpedition;
 window.rest = Game.rest;
 
-// 4. 戰鬥相關 (新版)
-window.handleCombat = Game.handleCombat; // 戰鬥主控
-window.attack = Game.attack;             // (備用，防舊代碼報錯)
-window.runAway = Game.runAway;           // (備用)
+// 4. 戰鬥相關
+window.handleCombat = Game.handleCombat;
+window.attack = Game.attack;
+window.runAway = Game.runAway;
 
 // 5. 商人相關
 window.buyItem = Game.buyItem;
