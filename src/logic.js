@@ -558,8 +558,6 @@ function triggerEvent(explorationType) {
         // 處理來自 events.js 的自定義事件
         handleEventEffect(chosenEvent);
     }
-
-    advanceDay(); // 每次前進都算一天
 }
 
 export function startExpedition(zoneId) {
@@ -579,6 +577,7 @@ export function startExpedition(zoneId) {
 
     UI.addLog(`你出發前往 ${zoneName} 進行探索。`, "log-system");
     UI.renderMainScreen();
+    advanceDay(); // 每次出發都算一天
     autoSave();
 }
 
