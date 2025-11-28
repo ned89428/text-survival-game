@@ -156,7 +156,8 @@ export function addToInventory(newItem) {
 
 // ✨ 補上遺失的 moveToStash ✨
 export function moveToStash(index) {
-    if (gameState.mode !== "town" || gameState.inBattle) {
+    // ✨ 修正：在城鎮商人介面也可以存取倉庫
+    if (gameState.inBattle || (gameState.mode !== 'town' && gameState.mode !== 'merchant')) {
         UI.addLog("現在無法存取倉庫！", "log-system");
         return;
     }
@@ -193,7 +194,8 @@ export function moveToStash(index) {
 
 // ✨ 補上遺失的 takeFromStash ✨
 export function takeFromStash(index) {
-    if (gameState.mode !== "town" || gameState.inBattle) {
+    // ✨ 修正：在城鎮商人介面也可以存取倉庫
+    if (gameState.inBattle || (gameState.mode !== 'town' && gameState.mode !== 'merchant')) {
         UI.addLog("現在無法存取倉庫！", "log-system");
         return;
     }
@@ -351,7 +353,17 @@ export function useItem(i) {
         }
     }
 }
-export function sellOneItem(i) { if (!gameState.merchantActive) { UI.addLog("需在商人處才能出售。"); return; } const item = inventory[i]; if (!item.sellPrice) return; player.gold += item.sellPrice; UI.addLog(`賣出 ${item.name} (+${item.sellPrice} G)`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateStatus(); UI.updateInventory(); renderMerchantUI(`你賣掉了 ${item.name} (+${item.sellPrice} G)`); autoSave(); }
+export function sellOneItem(i) { 
+    if (!gameState.merchantActive) { UI.addLog("需在商人處才能出售。"); return; } 
+    const item = inventory[i]; 
+    // ✨ 修正：如果沒有賣價，則自動取買價的一半
+    const sellValue = item.sellPrice || Math.floor(item.price / 2);
+    if (!sellValue || sellValue <= 0) { UI.addLog(`${item.name} 無法出售。`, "log-system"); return; }
+
+    player.gold += sellValue; 
+    UI.addLog(`賣出 ${item.name} (+${sellValue} G)`, "log-system"); 
+    if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateStatus(); UI.updateInventory(); renderMerchantUI(); autoSave(); 
+}
 export function dropItem(i) { const item = inventory[i]; UI.addLog(`丟棄了 ${item.name}`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateInventory(); autoSave(); }
 
 
@@ -523,7 +535,13 @@ export function retreatToTown() {
     gameState.mode = "town";
     gameState.currentZone = null;
     gameState.depth = 0;
-    UI.addLog("你安全地回到了城鎮。", "log-system");
+
+    // ✨ 新增：回到城鎮時，完全恢復 HP 和 MP
+    player.hp = player.maxHP;
+    player.mp = player.maxMP;
+
+    UI.addLog("你安全地回到了城鎮。HP與MP已完全恢復。", "log-system");
+    UI.updateStatus(); // 更新狀態以顯示恢復後的血魔
     UI.renderMainScreen();
     autoSave();
 }
@@ -869,6 +887,10 @@ export function confirmDefeat() {
     document.getElementById("defeatPanel").style.display = "none";
     
     player.alive = true;
+    // ✨ 新增：在城鎮醒來時，完全恢復 HP 和 MP
+    player.hp = player.maxHP;
+    player.mp = player.maxMP;
+
     UI.addLog(`🤕 你在城鎮中醒來，雖然失去了物品，但至少還活著。`, "log-system");
     
     UI.updateStatus();

@@ -191,8 +191,11 @@ export function updateInventory() {
     } else {
         inventory.forEach((item, i) => { // ✨ 修正：在商人介面顯示「賣出」按鈕
             let actionBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
-            let sellBtn = (gameState.merchantActive && item.sellPrice) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${item.sellPrice}G)</button>` : "";
             
+            // ✨ 修正：只要有 price 或 sellPrice 就能顯示賣出按鈕
+            const sellValue = item.sellPrice || Math.floor(item.price / 2);
+            let sellBtn = (gameState.merchantActive && sellValue > 0) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${sellValue}G)</button>` : "";
+
             // ✨ 存入按鈕：只有在正常模式顯示
             let storeBtn = (gameState.mode === 'town' && !gameState.merchantActive && !gameState.inBattle) 
                 ? `<button onclick="moveToStash(${i})" style="color:#f39c12; border-color:#f39c12;">存入</button>` 

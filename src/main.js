@@ -3,22 +3,27 @@ import * as Game from './logic.js';
 
 console.log("正在載入 Main.js...");
 
-// 初始化介面
+// ✨ 更新：設定遊戲標題
+const newTitle = "薪水小偷的冒險日誌";
+document.title = newTitle; // 設定瀏覽器分頁標題
+const titleElement = document.getElementById("title");
+if (titleElement) titleElement.innerText = newTitle; // 設定頁面內可見標題
+
 UI.updateStatus();
 UI.updateInventory();
-UI.addLog("歡迎來到文字生存傳說。", "log-system");
+UI.addLog(`歡迎來到${newTitle}。`, "log-system");
 
 // ===========================================================
 // 掛載函式到 window
 // ===========================================================
 
 try {
-    // 1. 系統與存檔
-    window.confirmName = Game.confirmName;
+    // 1. 系統與存檔 (將 confirmName 移到外面，確保初始畫面能用)
     window.chooseJob = Game.chooseJob;
     window.restartGame = Game.restartGame;
     window.hardReset = Game.hardReset;
     window.confirmDefeat = Game.confirmDefeat;
+    window.confirmName = Game.confirmName; // ✨ 確保 confirmName 被掛載
 
     // 2. 屬性與背包操作
     window.addAttr = Game.addAttr;
