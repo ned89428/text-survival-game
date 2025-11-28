@@ -41,39 +41,54 @@ export const ITEM_PREFIXES = [
 
 // 3. 消耗品 (Consumables)
 export const CONSUMABLES = [
-{ 
+    { 
         id: "food_ration", name: "乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 15, stackable: true,
         effects: [
             { target: "hunger", value: 30 },
         ],
-        desc: "恢復 30 飢餓。"
+        desc: "恢復 30 飢餓。",
+        chance: 80 // ✨ 新增：出現權重 (數字越大越常見)
     },
+
+        { 
+        id: "food_ration_large", name: "大乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 30, stackable: true,
+        effects: [
+            { target: "hunger", value: 60 },
+        ],
+        desc: "恢復 60 飢餓。",
+        chance: 20 // ✨ 新增：出現權重 (數字越小越稀有)
+    },
+    
     { 
         id: "potion_heal_s", name: "小回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 50, stackable: true,
         effects: [
             { target: "hp", value: 50 }
         ],
-        desc: "恢復 50 HP。"
+        desc: "恢復 50 HP。",
+        chance: 30
     },
     { 
         id: "potion_heal_m", name: "回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 120, stackable: true,
         effects: [
             { target: "hp", value: 150 }
         ],
-        desc: "恢復 150 HP。"
+        desc: "恢復 150 HP。",
+        chance: 10
     },
     { 
         id: "potion_mana_s", name: "小魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 60, stackable: true,
         effects: [
             { target: "mp", value: 30 }
         ],
-        desc: "恢復 30 MP。"
+        desc: "恢復 30 MP。",
+        chance: 30
     },
     { 
         id: "potion_mana_m", name: "魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 150, stackable: true,
         effects: [
             { target: "mp", value: 100 }
         ],
-        desc: "恢復 100 MP。"
+        desc: "恢復 100 MP。",
+        chance: 10
     }
 ]; 

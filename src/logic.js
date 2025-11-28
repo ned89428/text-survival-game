@@ -209,7 +209,57 @@ export function takeFromStash(index) {
 }
 
 function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); const sellPrice = Math.max(1, Math.floor((template.minLvl * 10 + 5) * quality.mod)); const buyPrice = sellPrice * 3; return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: false, stackable: false }; }
-function lootRandomItem(type) { if (type === "food") { const item = { ...CONSUMABLES[0] }; item.sellPrice = 5; addToInventory(item); UI.addLog(`🍱 你找到 ${item.name}，已放入背包。`, "log-system"); } else if (type === "treasure") { if (Math.random() < 0.5) { const potion = { ...CONSUMABLES[Math.floor(Math.random() * CONSUMABLES.length)] }; if(potion.type === "food") potion.type = "heal"; potion.sellPrice = Math.floor(potion.price / 2); addToInventory(potion); UI.addLog(`✨ 你找到 ${potion.name}！`, "log-system"); } else { const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 10, stackable: true }; addToInventory(mat); UI.addLog("🧩 你撿到一些普通素材。", "log-system"); } } else if (type === "material") { const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true }; addToInventory(mat); UI.addLog("🧩 你撿到一些普通素材。", "log-system"); } UI.updateInventory(); autoSave(); }
+
+// ✨ 新增：通用的權重隨機物品選擇器
+function getWeightedRandomItem(items) {
+    const validItems = items.filter(item => item && item.chance > 0);
+    if (validItems.length === 0) return null;
+
+    const totalWeight = validItems.reduce((sum, item) => sum + (item.chance || 0), 0);
+    if (totalWeight <= 0) return validItems[Math.floor(Math.random() * validItems.length)]; // 如果權重都是0，就隨機選一個
+
+    let random = Math.random() * totalWeight;
+    for (const item of validItems) {
+        random -= item.chance;
+        if (random <= 0) {
+            return item;
+        }
+    }
+    return validItems[validItems.length - 1]; // 備用，防止浮點數誤差
+}
+
+function lootRandomItem(type) {
+    if (type === "food") { 
+        const foodItems = CONSUMABLES.filter(c => c.id.includes("food_"));
+        const chosenItem = getWeightedRandomItem(foodItems);
+        if (chosenItem) {
+            const item = { ...chosenItem };
+            item.sellPrice = Math.floor(item.price / 2);
+            addToInventory(item);
+            UI.addLog(`🍱 你找到 ${item.name}，已放入背包。`, "log-system");
+        }
+    } else if (type === "treasure") {
+        if (Math.random() < 0.6) { // 60% 機率獲得消耗品
+            const chosenItem = getWeightedRandomItem(CONSUMABLES);
+            if (chosenItem) {
+                const item = { ...chosenItem };
+                item.sellPrice = Math.floor(item.price / 2);
+                addToInventory(item);
+                UI.addLog(`✨ 你找到 ${item.name}！`, "log-system");
+            }
+        } else { // 40% 機率獲得素材
+            const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 10, stackable: true };
+            addToInventory(mat);
+            UI.addLog("🧩 你撿到一些普通素材。", "log-system");
+        }
+    } else if (type === "material") {
+        const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true };
+        addToInventory(mat);
+        UI.addLog("🧩 你撿到一些普通素材。", "log-system");
+    }
+    UI.updateInventory();
+    autoSave();
+}
 export function equipItem(index) { const item = inventory[index]; if (!item || item.type !== "equip") return; const slot = item.slot; const currentEquip = player.equipment[slot]; if (currentEquip) addToInventory(currentEquip); player.equipment[slot] = item; inventory.splice(index, 1); UI.addLog(`你裝備了 ${item.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
 export function unequipItem(slot) { const item = player.equipment[slot]; if (!item) return; player.equipment[slot] = null; addToInventory(item); UI.addLog(`你卸下了 ${item.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
 export function useItem(i) { 
