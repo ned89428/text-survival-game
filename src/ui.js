@@ -65,7 +65,8 @@ export function renderMainScreen() {
         if(stashBox) stashBox.style.display = "none";
 
     } else if (gameState.mode === "merchant") {
-        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>流浪商人</h3><p>「看看有什麼需要的？」</p></div>`;
+        const merchantName = gameState.merchantName || '商人';
+        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>${merchantName}</h3><p>「看看有什麼需要的？」</p></div>`;
         let goodsHtml = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">`;
         gameState.merchantGoods.forEach((g, i) => {
             goodsHtml += `<button onclick="buyItem(${i})" style="font-size:14px;">${g.emoji} ${g.name}<br><span style="color:#f1c40f">${g.price} G</span></button>`;

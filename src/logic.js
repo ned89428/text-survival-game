@@ -3,6 +3,7 @@ import * as UI from './ui.js';
 import { ENEMIES } from './data/enemies.js';
 import { EVENTS } from './data/events.js'; // ✨ 1. 導入新的事件資料
 import { EQUIP_TEMPLATES, ITEM_PREFIXES, CONSUMABLES } from './data/items.js';
+import { MERCHANTS } from './data/merchants.js';
 import { SKILLS } from './data/skills.js'; 
 
 // ================== 核心工具 ==================
@@ -295,7 +296,7 @@ export function withdrawGold() {
     autoSave();
 }
 
-function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); const sellPrice = Math.max(1, Math.floor((template.minLvl * 10 + 5) * quality.mod)); const buyPrice = sellPrice * 3; return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: false, stackable: false }; }
+function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); const buyPrice = Math.max(1, Math.floor((template.basePrice || 50) * quality.mod)); const sellPrice = Math.floor(buyPrice / 2); return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: true, stackable: false }; }
 
 // ✨ 新增：通用的權重隨機物品選擇器
 function getWeightedRandomItem(items) {
@@ -411,12 +412,91 @@ export function sellOneItem(i) {
 export function dropItem(i) { const item = inventory[i]; UI.addLog(`丟棄了 ${item.name}`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateInventory(); autoSave(); }
 
 
-// ================== 商人系統 ==================
+// ================== 商人系統 (重構) ==================
+
+// Helper function to create a proper equipment object from a template
+function createEquipFromTemplate(template, price) {
+    if (!template) return null;
+    const stats = {};
+    if (template.baseAtk) stats.atk = template.baseAtk;
+    if (template.baseDef) stats.def = template.baseDef;
+    if (template.magicAtk) stats.magicAtk = template.magicAtk;
+    if (template.str) stats.str = template.str;
+    if (template.int) stats.int = template.int;
+    if (template.agi) stats.agi = template.agi;
+    if (template.con) stats.con = template.con;
+    if (template.hp) stats.hp = template.hp;
+    if (template.mp) stats.mp = template.mp;
+
+    return {
+        name: template.name,
+        emoji: template.emoji,
+        type: 'equip',
+        slot: template.type,
+        stats: stats,
+        price: price, // Use the price from merchant data
+        sellPrice: Math.floor(price / 2),
+        usable: true,
+        stackable: false,
+        minLvl: template.minLvl
+    };
+};
+
+function populateMerchantGoods(merchantType) {
+    const merchantData = MERCHANTS[merchantType];
+    if (!merchantData) return [];
+
+    let goods = [];
+
+    // --- 從固定列表或等級過濾的列表中產生商品 ---
+    const inventorySource = merchantData.inventory || merchantData.inventoryPool;
+    if (inventorySource) {
+        const availableItems = inventorySource.filter(itemDef => 
+            !itemDef.availableAtLevel || player.level >= itemDef.availableAtLevel
+        );
+
+        availableItems.forEach(itemDef => {
+            let item = null;
+            if (itemDef.type === 'consumable') {
+                const template = CONSUMABLES.find(c => c.id === itemDef.itemId);
+                if (template) {
+                    item = { ...template };
+                    // 允許商人的資料覆蓋預設價格，否則使用消耗品自己的價格
+                    item.price = itemDef.price || template.price;
+                }
+            } else if (itemDef.type === 'equipment') {
+                const template = EQUIP_TEMPLATES.find(e => e.id === itemDef.itemId);
+                if (template) {
+                    // 使用覆蓋價格，否則使用範本的基礎價格
+                    const finalPrice = itemDef.price || template.basePrice;
+                    item = createEquipFromTemplate(template, finalPrice);
+                }
+            }
+            if(item) goods.push(item);
+        });
+    }
+
+    // --- 產生隨機裝備 ---
+    if (merchantData.randomEquipment) {
+        const rules = merchantData.randomEquipment;
+        for (let i = 0; i < rules.count; i++) {
+            const level = player.level + (rules.levelBonus || 0);
+            const randomEquip = generateRandomEquipment(level);
+            goods.push(randomEquip);
+        }
+    }
+    
+    return goods.filter(g => g); // 最後過濾掉可能產生的 null
+}
 
 function maybeMerchant(from) {
     if (gameState.inBattle || gameState.merchantActive) return false;
-    let chance = from === "nearby" ? 0.05 : from === "dungeon" ? 0.1 : 0.08;
-    if (Math.random() < chance) { openMerchant(); return true; }
+    // 增加遇到流浪商人的機率
+    let chance = from === "nearby" ? 0.08 : from === "dungeon" ? 0.15 : 0.1;
+    if (Math.random() < chance) {
+        openMerchant('WANDERING'); // 指定開啟流浪商人
+        return true;
+    }
     return false;
 }
 
@@ -425,45 +505,25 @@ function renderMerchantUI(message = "") {
     UI.renderMainScreen();
 }
 
-function openMerchant() {
+// 通用的開啟商人介面函式
+function openMerchant(merchantType) {
+    const merchantData = MERCHANTS[merchantType];
+    if (!merchantData) return;
+    
     gameState.merchantActive = true;
     gameState.mode = "merchant";
-    const p1 = { ...CONSUMABLES[1] }; const p2 = { ...CONSUMABLES[3] }; const p3 = { ...CONSUMABLES[0] }; 
-    const equip = generateRandomEquipment(player.level + 1);
-    gameState.merchantGoods = [p1, p2, p3, equip];
-    UI.addLog("遇到了流浪商人");
+    gameState.isTownMerchant = (merchantType === 'TOWN'); // 只有城鎮商人才標記
+    gameState.merchantName = merchantData.name; // ✨ 設定商人名稱
+    
+    gameState.merchantGoods = populateMerchantGoods(merchantType);
+    
+    UI.addLog(`你來到了 ${merchantData.name}。`);
+    renderMerchantUI();
 }
 
-// ✨ 新增：開啟城鎮商人介面
+// 城鎮商人專用函式 (為了讓 UI 按鈕可以呼叫)
 export function openTownMerchant() {
-    gameState.merchantActive = true;
-    gameState.mode = "merchant";
-    gameState.isTownMerchant = true; // ✨ 標記為城鎮商人
-    
-    // ✨ 建立一個基礎商品列表
-    let goods = [
-        { ...CONSUMABLES.find(c => c.id === 'food_ration') },
-        { ...CONSUMABLES.find(c => c.id === 'potion_heal_s') },
-        { ...CONSUMABLES.find(c => c.id === 'potion_mana_s') },
-        { ...EQUIP_TEMPLATES.find(e => e.id === 'w_dagger'), price: 45 },  // 生鏽短刀
-        { ...EQUIP_TEMPLATES.find(e => e.id === 'b_shirt'), price: 60 },   // 布衣
-    ];
-
-    // ✨ 根據玩家等級解鎖更多商品
-    if (player.level >= 3) {
-        goods.push({ ...CONSUMABLES.find(c => c.id === 'food_ration_large') });
-        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'w_sword'), price: 180 }); // 鐵劍
-        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'b_leather'), price: 220 }); // 皮甲
-    }
-    if (player.level >= 5) {
-        goods.push({ ...CONSUMABLES.find(c => c.id === 'potion_heal_m') });
-        goods.push({ ...CONSUMABLES.find(c => c.id === 'potion_mana_m') });
-        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'w_axe'), price: 450 }); // 雙刃斧
-    }
-
-    gameState.merchantGoods = goods;
-    UI.addLog("你來到了城鎮的商店。");
-    renderMerchantUI(); // 確保 UI 刷新
+    openMerchant('TOWN');
 }
 
 export function buyItem(index) {
@@ -480,21 +540,23 @@ export function sellAllMaterials() {
     let total = 0;
     for(let i = inventory.length - 1; i >= 0; i--){
         if (inventory[i].type === "material" && inventory[i].sellPrice) {
-            total += inventory[i].sellPrice; inventory.splice(i, 1);
+            total += inventory[i].sellPrice * (inventory[i].count || 1);
+            inventory.splice(i, 1);
         }
     }
-    if (total > 0) { player.gold += total; UI.updateStatus(); UI.updateInventory(); UI.addLog(`出售素材獲得 ${total} G`, "log-system"); autoSave(); } 
+    if (total > 0) { player.gold += total; UI.updateStatus(); UI.updateInventory(); UI.addLog(`出售所有素材獲得 ${total} G`, "log-system"); autoSave(); } 
     else { UI.addLog("沒有素材可賣", "log-system"); }
 }
 
-export function closeMerchant() { // 👈 確保這裡有 export
+export function closeMerchant() {
     gameState.merchantActive = false; 
     gameState.merchantGoods = []; 
-    gameState.isTownMerchant = false; // ✨ 清除城鎮商人標記
-    gameState.mode = gameState.currentZone ? "explore" : "town"; // ✨ 修正：如果正在探索，則回到探索模式
+    gameState.isTownMerchant = false;
+    gameState.merchantName = null; // ✨ 清除商人名稱
+    gameState.mode = gameState.currentZone ? "explore" : "town";
     UI.addLog("結束交易"); 
     UI.updateInventory(); 
-    UI.renderMainScreen(); // ✨ 修正：呼叫主渲染函式來更新畫面與按鈕
+    UI.renderMainScreen();
 }
 
 // ================== 探索與戰鬥系統 ==================
