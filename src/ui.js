@@ -274,15 +274,24 @@ export function showExplorationActions() {
     const act = document.getElementById("actions");
     if (act) {
         // ✨ 更新：探索模式的按鈕
-        let retreatButton = '';
-        if (gameState.canSafelyRetreat) {
-            // 可以安全撤離
-            retreatButton = `<button onclick="retreatToTown()" style="background:#27ae60;">✅ 安全撤離</button>`;
+        if (gameState.currentZone === 'dungeon' || gameState.currentZone === 'expedition') {
+            // ✨ Roguelike 選擇模式
+            let retreatButton = gameState.canSafelyRetreat
+                ? `<button onclick="retreatToTown()" style="background:#27ae60; width:100%;">✅ 安全撤離</button>`
+                : `<button onclick="forceRetreat()" style="background:#c0392b; width:100%;">🏃‍♂️ 強制撤離 (危險)</button>`;
+
+            act.innerHTML = `
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px;">
+                    <button onclick="advanceExploration('cautious')">🧐 小心探索</button>
+                    <button onclick="advanceExploration('deep')">🔥 深入探索</button>
+                    <button onclick="advanceExploration('search_exit')">🧭 尋找出口</button>
+                </div>
+                ${retreatButton}`;
         } else {
-            // 只能強制撤離
-            retreatButton = `<button onclick="forceRetreat()" style="background:#c0392b;">🏃‍♂️ 強制撤離 (危險)</button>`;
+            // 原始模式 (for 'nearby')
+            const retreatButton = `<button onclick="retreatToTown()" style="background:#27ae60;">✅ 安全撤離</button>`;
+            act.innerHTML = `<button onclick="advanceExploration('default')">🚶‍♂️ 繼續前進</button>${retreatButton}`;
         }
-        act.innerHTML = `<button onclick="advanceExploration()">🚶‍♂️ 繼續前進</button>${retreatButton}`;
         act.style.display = "block";
     }
 }

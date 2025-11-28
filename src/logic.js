@@ -507,7 +507,7 @@ function handleEventEffect(event) {
     UI.updateStatus();
 }
 
-function triggerEvent() {
+function triggerEvent(explorationType) {
     const zone = gameState.currentZone;
     const depth = gameState.depth;
     UI.addLog(`你繼續深入... (第 ${depth} 層)`);
@@ -515,18 +515,34 @@ function triggerEvent() {
     // ✨ 2. 全面重構 triggerEvent 邏輯
     const possibleEvents = [
         // 基礎事件
-        { id: 'base_combat', name: '遭遇敵人', type: 'combat', chance: 40, zones: ['nearby', 'dungeon', 'expedition'] },
+        { id: 'base_combat', name: '遭遇敵人', type: 'combat', chance: 50, zones: ['nearby', 'dungeon', 'expedition'] },
         { id: 'base_loot_food', name: '找到食物', type: 'loot', lootType: 'food', chance: 20, zones: ['nearby', 'expedition'] },
         { id: 'base_loot_material', name: '找到素材', type: 'loot', lootType: 'material', chance: 30, zones: ['nearby'] },
-        { id: 'base_loot_treasure', name: '發現寶藏', type: 'loot', lootType: 'treasure', chance: 30, zones: ['dungeon', 'expedition'] },
+        { id: 'base_loot_treasure', name: '發現寶藏', type: 'loot', lootType: 'treasure', chance: 25, zones: ['dungeon', 'expedition'] },
         { id: 'base_merchant', name: '遇到商人', type: 'merchant', chance: 5, zones: ['nearby', 'dungeon', 'expedition'] },
-        { id: 'base_find_exit', name: '發現出口', type: 'exit', chance: 10, zones: ['dungeon', 'expedition'], condition: () => !gameState.canSafelyRetreat },
+        { id: 'base_find_exit', name: '發現出口', type: 'exit', chance: 5, zones: ['dungeon', 'expedition'], condition: () => !gameState.canSafelyRetreat },
         // 從 events.js 導入的自定義事件
         ...EVENTS
     ];
 
     // 篩選出當前區域可發生的事件
-    const validEvents = possibleEvents.filter(e => e.zones.includes(zone) && (!e.condition || e.condition()));
+    let validEvents = possibleEvents.filter(e => e.zones.includes(zone) && (!e.condition || e.condition()));
+
+    // ✨ 根據探索類型，動態調整事件權重
+    validEvents = validEvents.map(event => {
+        const newEvent = { ...event };
+        if (explorationType === 'cautious') { // 小心探索
+            if (newEvent.type === 'combat') newEvent.chance *= 0.5; // 戰鬥機率減半
+            if (newEvent.lootType === 'material') newEvent.chance *= 1.5; // 素材機率提升
+        } else if (explorationType === 'deep') { // 深入探索
+            if (newEvent.type === 'combat') newEvent.chance *= 1.5; // 戰鬥機率提升
+            if (newEvent.lootType === 'treasure') newEvent.chance *= 2.0; // 寶藏機率加倍
+        } else if (explorationType === 'search_exit') { // 尋找出口
+            if (newEvent.type === 'exit') newEvent.chance *= 5; // 出口機率 x5
+        }
+        return newEvent;
+    });
+
     const chosenEvent = getWeightedRandomItem(validEvents);
 
     if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
@@ -566,12 +582,12 @@ export function startExpedition(zoneId) {
     autoSave();
 }
 
-export function advanceExploration() {
+export function advanceExploration(explorationType = 'default') {
     if (gameState.mode !== 'explore' || !canDoExplore(5 + gameState.depth)) return; // 越深越餓
     
     gameState.depth++;
     stats.exploredNearby++; // 暫時先統一加到一個統計
-    triggerEvent();
+    triggerEvent(explorationType);
     autoSave();
 }
 
@@ -598,22 +614,24 @@ export function forceRetreat() {
     UI.addLog("你決定不顧一切地強制撤離...", "log-critical");
 
     // 懲罰計算
-    const lostGold = Math.floor(player.gold * 0.25);
+    // ✨ 改造：金錢損失改為 30% ~ 50% 的隨機浮動
+    const goldLossPercent = 0.3 + Math.random() * 0.2; // 0.3 to 0.5
+    const lostGold = Math.floor(player.gold * goldLossPercent);
     player.gold -= lostGold;
     UI.addLog(`💸 慌亂中，你遺失了 ${lostGold} G。`, "log-system");
 
-    const itemsToLose = Math.floor(inventory.length * 0.5);
+    // ✨ 改造：每個物品欄位都有 50% ~ 60% 的獨立機率遺失
     let lostItemsLog = [];
-    for (let i = 0; i < itemsToLose; i++) {
-        if (inventory.length > 0) {
-            const randomIndex = Math.floor(Math.random() * inventory.length);
-            const lostItem = inventory.splice(randomIndex, 1)[0];
-            lostItemsLog.push(lostItem.name);
+    for (let i = inventory.length - 1; i >= 0; i--) {
+        const dropChance = 0.5 + Math.random() * 0.1; // 50% to 60% chance
+        if (Math.random() < dropChance) {
+            const lostItem = inventory.splice(i, 1)[0];
+            lostItemsLog.push(`${lostItem.name} x${lostItem.count || 1}`);
         }
     }
 
     if (lostItemsLog.length > 0) {
-        UI.addLog(`🎒 為了逃跑，你丟棄了：${lostItemsLog.join("、 ")}。`, "log-system");
+        UI.addLog(`🎒 為了逃跑，你丟棄了：${lostItemsLog.reverse().join("、 ")}。`, "log-system");
     }
 
     // 10% 機率完美撤退 (範例)
@@ -929,7 +947,9 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         if (inventory.length > 0) {
             inventory.forEach(i => lostItems.push(i.name));
         }
-        let lostGold = Math.floor(player.gold / 2);
+        // ✨ 改造：金錢損失改為 60% ~ 80% 的隨機浮動
+        const goldLossPercent = 0.6 + Math.random() * 0.2; // 0.6 to 0.8
+        let lostGold = Math.floor(player.gold * goldLossPercent);
         
         let summaryHtml = `<p>死因：${reason}</p>`;
         summaryHtml += `<p style="color:#f1c40f">💸 損失金錢：${lostGold} G</p>`;

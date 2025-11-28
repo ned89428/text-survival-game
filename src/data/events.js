@@ -59,5 +59,28 @@ export const EVENTS = [
             { target: "hp", value: -20, message: "中毒了！損失 20 點HP。" },
             { target: "state", value: "中毒", message: "你陷入了中毒狀態。" }
         ]
+    },
+
+    // === 遠征 (Expedition) 專屬事件 ===
+    {
+        id: "e_ancient_fountain",
+        name: "古代泉水",
+        desc: "你發現一眼清澈的古代泉水，喝下後感到精神一振。",
+        type: "boon",
+        chance: 8,
+        zones: ["expedition"],
+        effects: [
+            { target: "mp", value: 50, message: "恢復了 50 點MP。" }
+        ]
+    },
+    {
+        id: "e_hidden_cache",
+        name: "隱藏的儲藏物",
+        desc: "在一個鬆動的石塊後面，你找到前人留下的少量物資。",
+        type: "loot",
+        lootType: "treasure", // 這裡也歸類為寶藏，讓 lootRandomItem 處理
+        chance: 10,
+        zones: ["dungeon", "expedition"],
+        effects: []
     }
 ];
