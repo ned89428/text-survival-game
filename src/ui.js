@@ -274,7 +274,15 @@ export function showExplorationActions() {
     const act = document.getElementById("actions");
     if (act) {
         // ✨ 更新：探索模式的按鈕
-        act.innerHTML = `<button onclick="advanceExploration()">🚶‍♂️ 繼續前進</button><button onclick="retreatToTown()" style="background:#c0392b;">🏃‍♂️ 撤回城鎮</button>`;
+        let retreatButton = '';
+        if (gameState.canSafelyRetreat) {
+            // 可以安全撤離
+            retreatButton = `<button onclick="retreatToTown()" style="background:#27ae60;">✅ 安全撤離</button>`;
+        } else {
+            // 只能強制撤離
+            retreatButton = `<button onclick="forceRetreat()" style="background:#c0392b;">🏃‍♂️ 強制撤離 (危險)</button>`;
+        }
+        act.innerHTML = `<button onclick="advanceExploration()">🚶‍♂️ 繼續前進</button>${retreatButton}`;
         act.style.display = "block";
     }
 }

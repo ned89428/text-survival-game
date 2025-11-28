@@ -23,7 +23,8 @@ export let gameState = {
     isProcessingTurn: false, // 戰鬥鎖定
     canAct: true,
     cooldownTimerId: null,
-    merchantActive: false,
+    merchantActive: false, // 是否在商人介面
+    canSafelyRetreat: false, // ✨ 新增：能否安全撤離
     merchantGoods: []
 };
 
@@ -48,35 +49,65 @@ function applyStateBonuses() {
 }
 
 // 核心：數值計算公式
-export function recalcDerivedStats() {
-    let effStr = player.str; let effAgi = player.agi; let effCon = player.con; let effInt = player.int;
-    let bonusAtk = 0; let bonusDef = 0; let bonusMagic = 0; let bonusHP = 0;
+export function recalcDerivedStats() { 
+    // === 1. 彙總基礎屬性與裝備加成 ===
+    let totalStr = player.str;
+    let totalAgi = player.agi;
+    let totalCon = player.con;
+    let totalInt = player.int;
+    let bonusAtk = 0, bonusDef = 0, bonusMagic = 0, bonusHP = 0, bonusMP = 0;
 
     Object.values(player.equipment).forEach(item => {
         if (item) {
-            effStr += (item.stats.str || 0); effAgi += (item.stats.agi || 0);
-            effCon += (item.stats.con || 0); effInt += (item.stats.int || 0);
+            totalStr += (item.stats.str || 0);
+            totalAgi += (item.stats.agi || 0);
+            totalCon += (item.stats.con || 0);
+            totalInt += (item.stats.int || 0);
             bonusAtk += (item.stats.atk || 0); bonusDef += (item.stats.def || 0);
             bonusMagic += (item.stats.magicAtk || 0); bonusHP += (item.stats.hp || 0);
+            bonusMP += (item.stats.mp || 0);
         }
     });
 
-    let hpMod = 10; let mpMod = 5; let defMod = 0.5; 
-    if (player.job === "戰士") { hpMod = 14; defMod = 1.0; player.atk = 5 + effStr * 2.5 + effAgi * 0.2; player.magicAtk = effInt * 0.5; } 
-    else if (player.job === "弓箭手") { hpMod = 10; player.atk = 5 + effAgi * 2.2 + effStr * 0.5; player.magicAtk = effInt * 0.8; }
-    else if (player.job === "盜賊") { hpMod = 9; player.atk = 5 + effStr * 1.2 + effAgi * 1.5; player.magicAtk = effInt * 0.8; }
-    else if (player.job === "法師") { hpMod = 8; mpMod = 5; player.atk = 2 + effStr * 0.5; player.magicAtk = 5 + effInt * 2.5; } // ✨ 修正：將法師的 mpMod 從 15 降為 5
-    else { player.atk = 5 + effStr * 2; player.magicAtk = effInt * 1; }
+    // === 2. 定義職業的屬性成長係數 ===
+    let hpPerCon = 10, mpPerInt = 5, atkPerStr = 2, atkPerAgi = 0.5, magicAtkPerInt = 2, defPerCon = 0.5;
+    
+    if (player.job === "戰士") {
+        hpPerCon = 15; atkPerStr = 2.5; defPerCon = 1.0;
+    } else if (player.job === "弓箭手") {
+        atkPerStr = 0.8; atkPerAgi = 2.2;
+    } else if (player.job === "盜賊") {
+        atkPerStr = 1.2; atkPerAgi = 1.8;
+    } else if (player.job === "法師") {
+        hpPerCon = 8; mpPerInt = 8; magicAtkPerInt = 3.0;
+    }
 
-    player.atk += bonusAtk; player.magicAtk += bonusMagic;
-    player.maxHP = 50 + (effCon * hpMod) + (player.level * 5) + bonusHP;
-    player.maxMP = 20 + (effInt * mpMod) + (player.level * 2);
-    player.hungerMax = 100 + effCon * 5;
-    player.def = (effCon * defMod) + bonusDef;
-    let rawDodge = effAgi * 0.5; player.dodge = Math.min(60, rawDodge); player.hitRate = 80 + (effAgi * 0.5); 
-    player.critChance = 5 + (effInt * 0.2) + (effAgi * 0.1); player.speed = 10 + effAgi * 1;
+    // === 3. 計算二級屬性 (公式透明化) ===
+    // 生命 = 基礎50 + 等級加成 + (體質 * 每點體質給的血量) + 裝備額外血量
+    player.maxHP = 50 + (player.level * 5) + (totalCon * hpPerCon) + bonusHP;
+    // 魔力 = 基礎20 + 等級加成 + (智慧 * 每點智慧給的魔力) + 裝備額外魔力
+    player.maxMP = 20 + (player.level * 2) + (totalInt * mpPerInt) + bonusMP;
+    // 飢餓 = 基礎100 + 體質微量加成
+    player.hungerMax = 100 + totalCon * 5;
+    // 攻擊 = 基礎5 + (力量 * 係數) + (敏捷 * 係數) + 裝備額外攻擊
+    player.atk = 5 + (totalStr * atkPerStr) + (totalAgi * atkPerAgi) + bonusAtk;
+    // 魔攻 = 基礎0 + (智慧 * 係數) + 裝備額外魔攻
+    player.magicAtk = (totalInt * magicAtkPerInt) + bonusMagic;
+    // 防禦 = (體質 * 係數) + 裝備額外防禦
+    player.def = (totalCon * defPerCon) + bonusDef;
+    // 速度 = 基礎10 + 敏捷加成
+    player.speed = 10 + totalAgi * 1.2;
+    // 命中 = 基礎85 + 敏捷加成
+    player.hitRate = 85 + totalAgi * 0.5;
+    // 閃避 = 敏捷加成 (上限 60%)
+    player.dodge = Math.min(60, totalAgi * 0.8);
+    // 暴擊 = 基礎5% + 智慧/敏捷微量加成
+    player.critChance = 5 + (totalInt * 0.2) + (totalAgi * 0.1);
 
+    // === 4. 處理特殊狀態加成 (例如：祝福、詛咒) ===
     applyStateBonuses();
+    
+    // === 5. 最後校正，確保目前值不超過最大值 ===
     player.hp = Math.min(player.hp, player.maxHP); player.mp = Math.min(player.mp || 0, player.maxMP);
     player.hunger = Math.min(player.hunger, player.hungerMax);
 }
@@ -101,6 +132,7 @@ export function resetGameData() {
     gameState.depth = 0; // ✨ 重置深度
     gameState.logs = []; 
     gameState.enemy = null; 
+    gameState.canSafelyRetreat = false; // ✨ 重置安全撤離狀態
     gameState.inBattle = false; 
     gameState.isProcessingTurn = false; gameState.canAct = true; gameState.merchantActive = false; gameState.merchantGoods = [];
     

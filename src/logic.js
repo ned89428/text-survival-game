@@ -1,6 +1,7 @@
 import { player, gameState, stats, inventory, stash, COOLDOWNS, resetGameData } from './state.js';
 import * as UI from './ui.js';
 import { ENEMIES } from './data/enemies.js';
+import { EVENTS } from './data/events.js'; // ✨ 1. 導入新的事件資料
 import { EQUIP_TEMPLATES, ITEM_PREFIXES, CONSUMABLES } from './data/items.js';
 import { SKILLS } from './data/skills.js'; 
 
@@ -482,30 +483,66 @@ function canDoExplore(costHunger) {
     UI.updateStatus(); return true;
 }
 
+// ✨ 3. 新增：事件效果處理器
+function handleEventEffect(event) {
+    UI.addLog(`➡️ ${event.desc}`, "log-system");
+    if (!event.effects || event.effects.length === 0) return;
+
+    event.effects.forEach(effect => {
+        if (effect.target === 'hp') {
+            player.hp = Math.max(0, Math.min(player.maxHP, player.hp + effect.value));
+        } else if (effect.target === 'mp') {
+            player.mp = Math.max(0, Math.min(player.maxMP, player.mp + effect.value));
+        } else if (effect.target === 'hunger') {
+            player.hunger = Math.max(0, Math.min(player.hungerMax, player.hunger + effect.value));
+        } else if (effect.target === 'state') {
+            player.state = effect.value;
+        }
+        // 未來可以擴充更多效果，如獲得物品、金錢等
+
+        if (effect.message) {
+            UI.addLog(effect.message, "log-system");
+        }
+    });
+    UI.updateStatus();
+}
+
 function triggerEvent() {
     const zone = gameState.currentZone;
     const depth = gameState.depth;
-    const r = Math.random();
     UI.addLog(`你繼續深入... (第 ${depth} 層)`);
 
-    if (maybeMerchant(zone)) return;
+    // ✨ 2. 全面重構 triggerEvent 邏輯
+    const possibleEvents = [
+        // 基礎事件
+        { id: 'base_combat', name: '遭遇敵人', type: 'combat', chance: 40, zones: ['nearby', 'dungeon', 'expedition'] },
+        { id: 'base_loot_food', name: '找到食物', type: 'loot', lootType: 'food', chance: 20, zones: ['nearby', 'expedition'] },
+        { id: 'base_loot_material', name: '找到素材', type: 'loot', lootType: 'material', chance: 30, zones: ['nearby'] },
+        { id: 'base_loot_treasure', name: '發現寶藏', type: 'loot', lootType: 'treasure', chance: 30, zones: ['dungeon', 'expedition'] },
+        { id: 'base_merchant', name: '遇到商人', type: 'merchant', chance: 5, zones: ['nearby', 'dungeon', 'expedition'] },
+        { id: 'base_find_exit', name: '發現出口', type: 'exit', chance: 10, zones: ['dungeon', 'expedition'], condition: () => !gameState.canSafelyRetreat },
+        // 從 events.js 導入的自定義事件
+        ...EVENTS
+    ];
 
-    // 根據區域決定事件
-    if (zone === 'nearby') {
-        addExp(10 + depth);
-        if (r < 0.4) startBattle(zone, depth);
-        else if (r < 0.8) lootRandomItem("food");
-        else lootRandomItem("material");
-    } else if (zone === 'dungeon') {
-        addExp(20 + depth * 2);
-        if (r < 0.8) startBattle(zone, depth);
-        else lootRandomItem("treasure");
-    } else if (zone === 'expedition') {
-        addExp(40 + depth * 3);
-        if (r < 0.7) startBattle(zone, depth);
-        else if (r < 0.9) lootRandomItem("treasure");
-        else lootRandomItem("food");
+    // 篩選出當前區域可發生的事件
+    const validEvents = possibleEvents.filter(e => e.zones.includes(zone) && (!e.condition || e.condition()));
+    const chosenEvent = getWeightedRandomItem(validEvents);
+
+    if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
+
+    // 根據事件類型執行動作
+    if (chosenEvent.type === 'combat') startBattle(zone, depth);
+    else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType);
+    else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
+    else if (chosenEvent.type === 'exit') {
+        gameState.canSafelyRetreat = true;
+        UI.addLog("✨ 你發現了一個隱蔽的出口或傳送陣！現在可以安全撤離了。", "log-system");
+    } else {
+        // 處理來自 events.js 的自定義事件
+        handleEventEffect(chosenEvent);
     }
+
     advanceDay(); // 每次前進都算一天
 }
 
@@ -516,6 +553,13 @@ export function startExpedition(zoneId) {
     gameState.mode = "explore";
     gameState.currentZone = zoneId;
     gameState.depth = 1;
+    
+    // ✨ 核心改造：根據區域設定初始撤離狀態
+    if (zoneId === 'nearby') {
+        gameState.canSafelyRetreat = true; // 附近可隨時安全撤離
+    } else {
+        gameState.canSafelyRetreat = false; // 地下城和遠征需要找到出口
+    }
 
     UI.addLog(`你出發前往 ${zoneName} 進行探索。`, "log-system");
     UI.renderMainScreen();
@@ -534,6 +578,7 @@ export function advanceExploration() {
 export function retreatToTown() {
     gameState.mode = "town";
     gameState.currentZone = null;
+    gameState.canSafelyRetreat = false;
     gameState.depth = 0;
 
     // ✨ 新增：回到城鎮時，完全恢復 HP 和 MP
@@ -544,6 +589,40 @@ export function retreatToTown() {
     UI.updateStatus(); // 更新狀態以顯示恢復後的血魔
     UI.renderMainScreen();
     autoSave();
+}
+
+// ✨ 新增：強制撤離函式 (帶懲罰)
+export function forceRetreat() {
+    if (gameState.mode !== 'explore') return;
+
+    UI.addLog("你決定不顧一切地強制撤離...", "log-critical");
+
+    // 懲罰計算
+    const lostGold = Math.floor(player.gold * 0.25);
+    player.gold -= lostGold;
+    UI.addLog(`💸 慌亂中，你遺失了 ${lostGold} G。`, "log-system");
+
+    const itemsToLose = Math.floor(inventory.length * 0.5);
+    let lostItemsLog = [];
+    for (let i = 0; i < itemsToLose; i++) {
+        if (inventory.length > 0) {
+            const randomIndex = Math.floor(Math.random() * inventory.length);
+            const lostItem = inventory.splice(randomIndex, 1)[0];
+            lostItemsLog.push(lostItem.name);
+        }
+    }
+
+    if (lostItemsLog.length > 0) {
+        UI.addLog(`🎒 為了逃跑，你丟棄了：${lostItemsLog.join("、 ")}。`, "log-system");
+    }
+
+    // 10% 機率完美撤退 (範例)
+    if (Math.random() < 0.1) {
+        UI.addLog("✨ 奇蹟發生了！你在混亂中毫髮無傷地逃脫了！(免除懲罰)", "log-system");
+        // (如果在這裡免除懲罰，需要把上面扣錢扣物的邏輯包在 else 裡)
+    }
+
+    retreatToTown(); // 最後呼叫安全回城函式來重置狀態
 }
 
 function startBossBattle(bossId) {
@@ -805,7 +884,7 @@ function winBattle() {
         } else { lootRandomItem("treasure"); }
         UI.updateInventory();
     }
-    UI.updateStatus(); UI.showMainActions(); UI.renderMainScreen(); autoSave();
+    UI.updateStatus(); UI.renderMainScreen(); autoSave();
 }
 
 function gameClear() {
@@ -897,7 +976,6 @@ export function confirmDefeat() {
     UI.updateInventory();
     UI.updateStash();
     UI.renderMainScreen();
-    UI.showMainActions();
     autoSave();
 }
 
@@ -949,6 +1027,6 @@ export function chooseJob(jobKey) {
     UI.updateInventory(); UI.updateStash();
     player.hp = player.maxHP; player.mp = player.maxMP; UI.updateStatus(); document.getElementById("overlay").style.display = "none"; UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
     UI.addLog(`獲得新手資助：100 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
-    gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); UI.showMainActions(); autoSave(); 
+    gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave(); 
 }
 export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }

@@ -42,6 +42,7 @@ try {
     window.startExpedition = Game.startExpedition;
     window.advanceExploration = Game.advanceExploration;
     window.retreatToTown = Game.retreatToTown;
+    window.forceRetreat = Game.forceRetreat; // ✨ 掛載強制撤離函式
 
     // 4. 戰鬥相關
     window.handleCombat = Game.handleCombat;
