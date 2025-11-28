@@ -58,7 +58,6 @@ export const CONSUMABLES = [
         desc: "恢復 60 飢餓。",
         chance: 20 // ✨ 新增：出現權重 (數字越小越稀有)
     },
-    
     { 
         id: "potion_heal_s", name: "小回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 50, stackable: true,
         effects: [

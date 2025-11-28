@@ -74,18 +74,21 @@ export function renderMainScreen() {
         actionButtons = `${goodsHtml}<div style="margin-top:10px; text-align:center;"><button onclick="sellAllMaterials()">出售所有素材</button><button onclick="closeMerchant()">離開商人</button></div>`;
         
         // 商人模式隱藏倉庫
-        const stashBox = document.getElementById("stashBox");
-        if(stashBox) stashBox.style.display = "none";
-
     } else {
-        // === 正常模式 ===
-        const icon = gameState.enemy ? gameState.enemy.emoji : "⛺"; 
-        const title = gameState.enemy ? gameState.enemy.name : "探索中...";
-        topSection = `<div style="text-align:center; margin-bottom:10px; opacity: 0.8;"><div style="font-size: 60px;">${icon}</div><div style="font-size: 18px; font-weight:bold;">${title}</div></div>`;
+        // === 城鎮 / 探索模式 ===
+        const isExploring = gameState.mode === 'explore'; // 判斷是否在探索中
+        const icon = isExploring ? '🥾' : '⛺'; // ✨ 探索模式使用靴子圖示
+        const title = isExploring ? `探索中... (${gameState.currentZone})` : "城鎮";
+        const subTitle = isExploring ? `深度: ${gameState.depth}` : "選擇你的行動";
+        topSection = `<div style="text-align:center; margin-bottom:10px; opacity: 0.8;"><div style="font-size: 60px;">${icon}</div><div style="font-size: 18px; font-weight:bold;">${title}</div><div style="font-size: 14px; color: #ccc;">${subTitle}</div></div>`;
         
         if (actionsDiv) {
             actionsDiv.style.display = "block";
-            if (actionsDiv.innerHTML.trim() === "") showMainActions();
+            if (isExploring) {
+                showExplorationActions();
+            } else {
+                showTownActions();
+            }
         }
     }
 
@@ -186,12 +189,12 @@ export function updateInventory() {
     if (inventory.length === 0) {
         itemsDiv.innerHTML = `<div style="opacity:0.7; padding:10px;">（背包是空的）</div>`;
     } else {
-        inventory.forEach((item, i) => {
+        inventory.forEach((item, i) => { // ✨ 修正：在商人介面顯示「賣出」按鈕
             let actionBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
             let sellBtn = (gameState.merchantActive && item.sellPrice) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${item.sellPrice}G)</button>` : "";
             
             // ✨ 存入按鈕：只有在正常模式顯示
-            let storeBtn = (gameState.mode === 'normal' && !gameState.merchantActive && !gameState.inBattle) 
+            let storeBtn = (gameState.mode === 'town' && !gameState.merchantActive && !gameState.inBattle) 
                 ? `<button onclick="moveToStash(${i})" style="color:#f39c12; border-color:#f39c12;">存入</button>` 
                 : "";
             
@@ -217,38 +220,58 @@ export function updateStash() {
     const box = document.getElementById("stashBox");
     if (!box) return;
     
-    if (gameState.mode !== 'normal' || gameState.inBattle || gameState.merchantActive) { 
+    // ✨ 修正：只有在戰鬥中、探索中、或遇到流浪商人才隱藏倉庫
+    if (gameState.inBattle || gameState.mode === 'explore' || (gameState.merchantActive && !gameState.isTownMerchant)) {
         box.style.display = 'none'; 
         return; 
     }
     box.style.display = 'block';
 
-    box.innerHTML = `<div class="inv-title" style="margin-bottom:10px; color:#3498db;">📦 倉庫（${stash.length}）</div><div class="inv-items" style="display:block;"></div>`;
+    // ✨ 更新：顯示倉庫金錢與存取按鈕
+    box.innerHTML = `
+        <div class="inv-title" style="margin-bottom:10px; color:#3498db;">📦 倉庫（${stash.items.length}）</div>
+        <div class="stash-gold-section">
+            <span style="font-size: 16px; color: #f1c40f; font-weight: bold;">💰 ${stash.gold} G</span>
+            <div>
+                <button onclick="depositGold()">存入</button>
+                <button onclick="withdrawGold()">取出</button>
+            </div>
+        </div>
+        <div class="inv-items" style="display:block;"></div>`;
     const itemsDiv = box.querySelector(".inv-items");
     
-    if (stash.length === 0) { itemsDiv.innerHTML = `<div style="opacity:0.7; padding:10px;">（倉庫是空的）</div>`; return; }
+    if (stash.items.length === 0) { itemsDiv.innerHTML = `<div style="opacity:0.7; padding:10px;">（物品是空的）</div>`; }
 
-    stash.forEach((item, i) => {
+    stash.items.forEach((item, i) => {
         let statsDesc = item.type === "equip" ? `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(item.stats)}</div>` : "";
         let countDisplay = (item.count && item.count > 1) ? `<span style="font-weight:bold; color:#fff; margin-left:5px;">x${item.count}</span>` : "";
         itemsDiv.innerHTML += `
             <div class="inv-item" style="background:#2c3e50; border-color:#34495e;">
                 <div style="flex:1"><div>${item.emoji} ${item.name} ${countDisplay}</div>${statsDesc}</div>
-                <div style="display:flex; align-items:center;"><button onclick="takeFromStash(${i})" style="color:#3498db; border-color:#3498db;">取出</button></div>
+                <div style="display:flex; align-items:center;"><button onclick="takeFromStash(${i})" style="color:#3498db; border-color:#3498db;">取出 1個</button></div>
             </div>
         `;
     });
 }
 
-export function showMainActions() {
+export function showTownActions() {
     const act = document.getElementById("actions");
     if (act) {
+        // ✨ 更新：城鎮模式的按鈕
         act.innerHTML = `
-            <button onclick="exploreNearby()">附近搜索（10s）</button>
-            <button onclick="exploreDungeon()">地下城（20s）</button>
-            <button onclick="exploreExpedition()">遠征（45s）</button>
-            <button onclick="rest()">休息（10s）</button>
-        `;
+            <button onclick="startExpedition('nearby')">🌲 前往附近 (蒐集)</button>
+            <button onclick="startExpedition('dungeon')">🕳️ 探索地下城 (挑戰)</button>
+            <button onclick="startExpedition('expedition')">🗺️ 踏上遠征 (危險)</button>
+            <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>`;
+        act.style.display = "block";
+    }
+}
+
+export function showExplorationActions() {
+    const act = document.getElementById("actions");
+    if (act) {
+        // ✨ 更新：探索模式的按鈕
+        act.innerHTML = `<button onclick="advanceExploration()">🚶‍♂️ 繼續前進</button><button onclick="retreatToTown()" style="background:#c0392b;">🏃‍♂️ 撤回城鎮</button>`;
         act.style.display = "block";
     }
 }

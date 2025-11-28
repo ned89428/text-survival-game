@@ -30,12 +30,13 @@ try {
     window.unequipItem = Game.unequipItem;
     window.moveToStash = Game.moveToStash;
     window.takeFromStash = Game.takeFromStash;
+    window.depositGold = Game.depositGold;
+    window.withdrawGold = Game.withdrawGold;
 
     // 3. 探索行動
-    window.exploreNearby = Game.exploreNearby;
-    window.exploreDungeon = Game.exploreDungeon;
-    window.exploreExpedition = Game.exploreExpedition;
-    window.rest = Game.rest;
+    window.startExpedition = Game.startExpedition;
+    window.advanceExploration = Game.advanceExploration;
+    window.retreatToTown = Game.retreatToTown;
 
     // 4. 戰鬥相關
     window.handleCombat = Game.handleCombat;
@@ -43,6 +44,7 @@ try {
 
     // 5. 商人相關 (請特別注意這裡)
     window.buyItem = Game.buyItem;
+    window.openTownMerchant = Game.openTownMerchant;
     window.sellAllMaterials = Game.sellAllMaterials;
     window.closeMerchant = Game.closeMerchant;
 

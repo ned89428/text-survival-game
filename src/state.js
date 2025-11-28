@@ -14,7 +14,9 @@ export let player = {
 
 // 2. 遊戲全域狀態
 export let gameState = {
-    mode: "normal",       // normal, battle, merchant
+    mode: "town",       // 核心模式：town (城鎮), explore (探索), battle (戰鬥), merchant (商人)
+    currentZone: null,
+    depth: 0,
     logs: [],             // 統一 Log
     enemy: null,
     inBattle: false,
@@ -30,7 +32,10 @@ export let stats = { kills: 0, exploredNearby: 0, exploredDungeon: 0, exploredEx
 
 // 4. 背包與倉庫
 export let inventory = [];
-export let stash = []; // ✨ 新增：倉庫 ✨
+export let stash = {
+    items: [], // 原本的倉庫物品陣列
+    gold: 0    // ✨ 新增：倉庫金錢
+};
 
 // 5. 冷卻時間設定
 export const COOLDOWNS = { NEARBY: 0, DUNGEON: 0, EXPEDITION: 0, REST: 0 };
@@ -60,7 +65,7 @@ export function recalcDerivedStats() {
     if (player.job === "戰士") { hpMod = 14; defMod = 1.0; player.atk = 5 + effStr * 2.5 + effAgi * 0.2; player.magicAtk = effInt * 0.5; } 
     else if (player.job === "弓箭手") { hpMod = 10; player.atk = 5 + effAgi * 2.2 + effStr * 0.5; player.magicAtk = effInt * 0.8; }
     else if (player.job === "盜賊") { hpMod = 9; player.atk = 5 + effStr * 1.2 + effAgi * 1.5; player.magicAtk = effInt * 0.8; }
-    else if (player.job === "法師") { hpMod = 8; mpMod = 15; player.atk = 2 + effStr * 0.5; player.magicAtk = 5 + effInt * 2.5; }
+    else if (player.job === "法師") { hpMod = 8; mpMod = 5; player.atk = 2 + effStr * 0.5; player.magicAtk = 5 + effInt * 2.5; } // ✨ 修正：將法師的 mpMod 從 15 降為 5
     else { player.atk = 5 + effStr * 2; player.magicAtk = effInt * 1; }
 
     player.atk += bonusAtk; player.magicAtk += bonusMagic;
@@ -91,11 +96,17 @@ export function resetGameData() {
     player.atk = 5; player.magicAtk = 0; player.def = 0; player.dodge = 0; player.hitRate = 80; player.speed = 5; player.critChance = 5;
     player.gold = 0; player.state = "正常"; player.alive = true;
 
-    gameState.mode = "normal"; gameState.logs = []; gameState.enemy = null; gameState.inBattle = false; 
+    gameState.mode = "town"; // ✨ 重置為 town 模式
+    gameState.currentZone = null; // ✨ 重置目前區域
+    gameState.depth = 0; // ✨ 重置深度
+    gameState.logs = []; 
+    gameState.enemy = null; 
+    gameState.inBattle = false; 
     gameState.isProcessingTurn = false; gameState.canAct = true; gameState.merchantActive = false; gameState.merchantGoods = [];
     
     inventory.length = 0;
-    stash.length = 0; // ✨ 重置倉庫
+    stash.items = []; // ✨ 重置倉庫物品
+    stash.gold = 0;   // ✨ 重置倉庫金錢
     
     stats.kills = 0; stats.exploredNearby = 0; stats.exploredDungeon = 0; stats.exploredExpedition = 0;
 }

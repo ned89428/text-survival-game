@@ -32,8 +32,15 @@ export function checkSaveAndStart() {
         inventory.length = 0;
         data.inventory.forEach(item => { if (!item.count) item.count = 1; inventory.push(item); });
 
-        stash.length = 0;
-        if (data.stash) data.stash.forEach(item => { if (!item.count) item.count = 1; stash.push(item); });
+        // ✨ 修正：正確讀取倉庫存檔 (包含物品與金錢)
+        stash.items = [];
+        stash.gold = 0;
+        if (data.stash) {
+            if (data.stash.items) {
+                data.stash.items.forEach(item => { if (!item.count) item.count = 1; stash.items.push(item); });
+            }
+            stash.gold = data.stash.gold || 0;
+        }
 
         Object.assign(gameState, data.gameState);
         Object.assign(stats, data.stats);
@@ -46,16 +53,16 @@ export function checkSaveAndStart() {
 
         // 商人防呆
         if (gameState.mode === 'merchant' && (!gameState.merchantGoods || gameState.merchantGoods.length === 0)) {
-            gameState.mode = 'normal';
+            gameState.mode = 'town';
             gameState.merchantActive = false;
         }
         // 戰鬥防呆
         if (gameState.mode === 'battle' && !gameState.enemy) {
-            gameState.mode = 'normal';
+            gameState.mode = 'town';
             gameState.inBattle = false;
         }
         // 正常模式防呆
-        if (gameState.mode === 'normal') {
+        if (gameState.mode === 'town') {
             gameState.inBattle = false;
             gameState.enemy = null;
             gameState.merchantActive = false;
@@ -149,16 +156,16 @@ export function addToInventory(newItem) {
 
 // ✨ 補上遺失的 moveToStash ✨
 export function moveToStash(index) {
-    if (gameState.mode !== "normal" || gameState.inBattle) {
+    if (gameState.mode !== "town" || gameState.inBattle) {
         UI.addLog("現在無法存取倉庫！", "log-system");
         return;
     }
     const item = inventory[index];
     if (!item) return;
 
-    // 處理堆疊
+    // 處理物品堆疊
     if (item.stackable) {
-        const existing = stash.find(i => i.id === item.id);
+        const existing = stash.items.find(i => i.id === item.id);
         if (existing) {
             if (!existing.count) existing.count = 1;
             existing.count++;
@@ -167,16 +174,16 @@ export function moveToStash(index) {
         } else {
             if (item.count > 1) {
                 item.count--;
-                stash.push({ ...item, count: 1 });
+                stash.items.push({ ...item, count: 1 });
             } else {
                 inventory.splice(index, 1);
-                stash.push(item);
+                stash.items.push(item);
             }
         }
     } else {
         // 不可堆疊 (如裝備) 直接移動
         inventory.splice(index, 1);
-        stash.push(item);
+        stash.items.push(item);
     }
 
     UI.updateInventory();
@@ -186,11 +193,11 @@ export function moveToStash(index) {
 
 // ✨ 補上遺失的 takeFromStash ✨
 export function takeFromStash(index) {
-    if (gameState.mode !== "normal" || gameState.inBattle) {
+    if (gameState.mode !== "town" || gameState.inBattle) {
         UI.addLog("現在無法存取倉庫！", "log-system");
         return;
     }
-    const item = stash[index];
+    const item = stash.items[index];
     if (!item) return;
 
     // 取出一個放入背包
@@ -200,9 +207,43 @@ export function takeFromStash(index) {
     if (item.count > 1) {
         item.count--;
     } else {
-        stash.splice(index, 1);
+        stash.items.splice(index, 1);
     }
 
+    UI.updateInventory();
+    UI.updateStash();
+    autoSave();
+}
+
+// ✨ 新增：存入金錢
+export function depositGold() {
+    const amountStr = prompt("要存入多少金錢？ (可輸入 all)", "");
+    if (amountStr === null) return; // 玩家取消
+
+    let amount = (amountStr.toLowerCase() === 'all') ? player.gold : parseInt(amountStr);
+    if (isNaN(amount) || amount <= 0) return;
+    if (amount > player.gold) { UI.addLog("你沒有那麼多錢！", "log-system"); return; }
+
+    player.gold -= amount;
+    stash.gold += amount;
+    UI.addLog(`你將 ${amount} G 存入了倉庫。`, "log-system");
+    UI.updateInventory();
+    UI.updateStash();
+    autoSave();
+}
+
+// ✨ 新增：取出金錢
+export function withdrawGold() {
+    const amountStr = prompt("要取出多少金錢？ (可輸入 all)", "");
+    if (amountStr === null) return;
+
+    let amount = (amountStr.toLowerCase() === 'all') ? stash.gold : parseInt(amountStr);
+    if (isNaN(amount) || amount <= 0) return;
+    if (amount > stash.gold) { UI.addLog("倉庫裡沒有那麼多錢！", "log-system"); return; }
+
+    stash.gold -= amount;
+    player.gold += amount;
+    UI.addLog(`你從倉庫取出了 ${amount} G。`, "log-system");
     UI.updateInventory();
     UI.updateStash();
     autoSave();
@@ -277,16 +318,24 @@ export function useItem(i) {
 
         for (const effect of item.effects) {
             const { target, value } = effect;
-            const targetMax = player[target + 'Max'];
+            
+            // ✨ 修正：正確對應最大值屬性名稱
+            let maxTargetProp;
+            if (target === 'hp') maxTargetProp = 'maxHP';
+            else if (target === 'mp') maxTargetProp = 'maxMP';
+            else if (target === 'hunger') maxTargetProp = 'hungerMax';
+            
+            const targetMax = player[maxTargetProp];
 
-            if (player[target] >= targetMax) {
+            // 如果找不到對應的最大值，或目前值已滿，則跳過
+            if (targetMax === undefined || player[target] >= targetMax) {
                 // 如果是單一效果且已滿，則提示並中止
                 if (item.effects.length === 1) {
                     const targetName = { hp: "HP", mp: "MP", hunger: "飢餓" }[target] || target;
                     UI.addLog(`${targetName} 已經滿了。`, "log-system");
                     return;
                 }
-                continue; // 如果是多重效果，跳過已滿的屬性
+                continue;
             }
             
             player[target] = Math.min(targetMax, player[target] + value);
@@ -329,6 +378,38 @@ function openMerchant() {
     UI.addLog("遇到了流浪商人");
 }
 
+// ✨ 新增：開啟城鎮商人介面
+export function openTownMerchant() {
+    gameState.merchantActive = true;
+    gameState.mode = "merchant";
+    gameState.isTownMerchant = true; // ✨ 標記為城鎮商人
+    
+    // ✨ 建立一個基礎商品列表
+    let goods = [
+        { ...CONSUMABLES.find(c => c.id === 'food_ration') },
+        { ...CONSUMABLES.find(c => c.id === 'potion_heal_s') },
+        { ...CONSUMABLES.find(c => c.id === 'potion_mana_s') },
+        { ...EQUIP_TEMPLATES.find(e => e.id === 'w_dagger'), price: 45 },  // 生鏽短刀
+        { ...EQUIP_TEMPLATES.find(e => e.id === 'b_shirt'), price: 60 },   // 布衣
+    ];
+
+    // ✨ 根據玩家等級解鎖更多商品
+    if (player.level >= 3) {
+        goods.push({ ...CONSUMABLES.find(c => c.id === 'food_ration_large') });
+        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'w_sword'), price: 180 }); // 鐵劍
+        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'b_leather'), price: 220 }); // 皮甲
+    }
+    if (player.level >= 5) {
+        goods.push({ ...CONSUMABLES.find(c => c.id === 'potion_heal_m') });
+        goods.push({ ...CONSUMABLES.find(c => c.id === 'potion_mana_m') });
+        goods.push({ ...EQUIP_TEMPLATES.find(e => e.id === 'w_axe'), price: 450 }); // 雙刃斧
+    }
+
+    gameState.merchantGoods = goods;
+    UI.addLog("你來到了城鎮的商店。");
+    renderMerchantUI(); // 確保 UI 刷新
+}
+
 export function buyItem(index) {
     const item = gameState.merchantGoods[index];
     if (!item || typeof item.price !== 'number') return;
@@ -353,10 +434,11 @@ export function sellAllMaterials() {
 export function closeMerchant() { // 👈 確保這裡有 export
     gameState.merchantActive = false; 
     gameState.merchantGoods = []; 
-    gameState.mode = "normal"; // 切回正常模式
+    gameState.isTownMerchant = false; // ✨ 清除城鎮商人標記
+    gameState.mode = gameState.currentZone ? "explore" : "town"; // ✨ 修正：如果正在探索，則回到探索模式
     UI.addLog("結束交易"); 
     UI.updateInventory(); 
-    UI.showMainActions(); // 顯示下方按鈕
+    UI.renderMainScreen(); // ✨ 修正：呼叫主渲染函式來更新畫面與按鈕
 }
 
 // ================== 探索與戰鬥系統 ==================
@@ -388,13 +470,63 @@ function canDoExplore(costHunger) {
     UI.updateStatus(); return true;
 }
 
-export function exploreNearby() { if (!canDoExplore(5)) return; stats.exploredNearby++; UI.addLog("🔍 你在附近小心搜索……"); startCooldown(COOLDOWNS.NEARBY); setTimeout(() => { if (player.alive) { resolveNearby(); advanceDay(); } }, COOLDOWNS.NEARBY * 1000); }
-export function exploreDungeon() { if (!canDoExplore(10)) return; stats.exploredDungeon++; UI.addLog("🕳️ 你走入陰暗的地下城……"); startCooldown(COOLDOWNS.DUNGEON); setTimeout(() => { if (player.alive) { resolveDungeon(); advanceDay(); } }, COOLDOWNS.DUNGEON * 1000); }
-export function exploreExpedition() { if (!canDoExplore(25)) return; stats.exploredExpedition++; UI.addLog("🏕️ 你踏上長時間遠征……"); startCooldown(COOLDOWNS.EXPEDITION); setTimeout(() => { if (player.alive) { resolveExpedition(); advanceDay(); } }, COOLDOWNS.EXPEDITION * 1000); }
+function triggerEvent() {
+    const zone = gameState.currentZone;
+    const depth = gameState.depth;
+    const r = Math.random();
+    UI.addLog(`你繼續深入... (第 ${depth} 層)`);
 
-function resolveNearby() { if (gameState.enemy && gameState.enemy.name === "身體極限") gameState.enemy = null; if (maybeMerchant("nearby")) return; const r = Math.random(); addExp(10); if (r < 0.4) startBattle("nearby", 1); else if (r < 0.8) lootRandomItem("food"); else lootRandomItem("material"); }
-function resolveDungeon() { if (gameState.enemy && gameState.enemy.name === "身體極限") gameState.enemy = null; if (maybeMerchant("dungeon")) return; const r = Math.random(); addExp(20); if (r < 0.8) startBattle("dungeon", 2); else lootRandomItem("treasure"); }
-function resolveExpedition() { if (gameState.enemy && gameState.enemy.name === "身體極限") gameState.enemy = null; if (maybeMerchant("expedition")) return; const r = Math.random(); addExp(40); if (r < 0.2) startBattle("expedition", 3); else if (r < 0.6) lootRandomItem("treasure"); else lootRandomItem("food"); }
+    if (maybeMerchant(zone)) return;
+
+    // 根據區域決定事件
+    if (zone === 'nearby') {
+        addExp(10 + depth);
+        if (r < 0.4) startBattle(zone, depth);
+        else if (r < 0.8) lootRandomItem("food");
+        else lootRandomItem("material");
+    } else if (zone === 'dungeon') {
+        addExp(20 + depth * 2);
+        if (r < 0.8) startBattle(zone, depth);
+        else lootRandomItem("treasure");
+    } else if (zone === 'expedition') {
+        addExp(40 + depth * 3);
+        if (r < 0.7) startBattle(zone, depth);
+        else if (r < 0.9) lootRandomItem("treasure");
+        else lootRandomItem("food");
+    }
+    advanceDay(); // 每次前進都算一天
+}
+
+export function startExpedition(zoneId) {
+    if (!canDoExplore(1)) return; // 出發時只檢查，不扣太多
+    const zoneName = { nearby: "附近", dungeon: "地下城", expedition: "遠征" }[zoneId] || "未知區域";
+    
+    gameState.mode = "explore";
+    gameState.currentZone = zoneId;
+    gameState.depth = 1;
+
+    UI.addLog(`你出發前往 ${zoneName} 進行探索。`, "log-system");
+    UI.renderMainScreen();
+    autoSave();
+}
+
+export function advanceExploration() {
+    if (gameState.mode !== 'explore' || !canDoExplore(5 + gameState.depth)) return; // 越深越餓
+    
+    gameState.depth++;
+    stats.exploredNearby++; // 暫時先統一加到一個統計
+    triggerEvent();
+    autoSave();
+}
+
+export function retreatToTown() {
+    gameState.mode = "town";
+    gameState.currentZone = null;
+    gameState.depth = 0;
+    UI.addLog("你安全地回到了城鎮。", "log-system");
+    UI.renderMainScreen();
+    autoSave();
+}
 
 function startBossBattle(bossId) {
     gameState.mode = "battle";
@@ -614,12 +746,13 @@ export async function runAway() {
 
     let escapeChance = 50 + (player.speed * 2); 
     if (Math.random() * 100 < escapeChance) {
-        gameState.inBattle = false; gameState.mode = "normal"; 
+        // ✨ 修正：逃跑成功後，應該回到探索模式，而不是直接回城
+        gameState.inBattle = false; 
+        gameState.mode = gameState.currentZone ? "explore" : "town"; // 如果有 zone 記錄，就回到 explore
         gameState.enemy = null; 
         UI.addLog("🏃‍♂️ 你成功脫離了戰鬥。", "log-battle");
         gameState.isProcessingTurn = false; 
         UI.renderMainScreen(); 
-        UI.showMainActions();
         autoSave();
     } else {
         UI.addLog("🚫 逃跑失敗！被敵人抓住了！", "log-critical");
@@ -636,7 +769,9 @@ function winBattle() {
 
     if (enemy.id === "boss_dragon") { gameClear(); return; }
 
-    gameState.inBattle = false; gameState.mode = "normal"; gameState.enemy = null; gameState.isProcessingTurn = false;
+    // ✨ 修正：戰鬥勝利後，應該回到探索模式或城鎮模式
+    gameState.inBattle = false; 
+    gameState.mode = gameState.currentZone ? "explore" : "town"; gameState.enemy = null; gameState.isProcessingTurn = false;
     UI.addLog(`🎉 擊敗了 ${enemy.name}！`, "log-battle");
     addExp(enemy.exp || 10); stats.kills++;
     const goldGain = 5 + Math.floor(Math.random() * 11) + (enemy.lvl * 2);
@@ -656,7 +791,7 @@ function winBattle() {
 }
 
 function gameClear() {
-    gameState.inBattle = false; gameState.mode = "normal"; gameState.enemy = null; gameState.isProcessingTurn = false;
+    gameState.inBattle = false; gameState.mode = "town"; gameState.enemy = null; gameState.isProcessingTurn = false;
     document.getElementById("eventBox").innerHTML = `<div style="text-align:center; padding: 20px;"><div style="font-size: 80px;">🏆</div><h2 style="color: #f1c40f;">恭喜通關！</h2><p>你擊敗了遠古巨龍，成為了傳說中的英雄。</p><p>總天數：${player.day} 天</p><p>等級：Lv ${player.level}</p><div style="margin-top:30px; border:1px solid #444; padding:10px; border-radius:8px; background:#222;"><p style="color:#aaa; font-size:14px;">開發者筆記：<br>感謝遊玩！<br>你可以在這裡繼續冒險，或是按下方按鈕重新開始。</p></div></div>`;
     UI.addLog("🏆 恭喜！你完成了遊戲目標！", "log-system");
     UI.showMainActions();
@@ -715,7 +850,7 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         player.state = "重傷";
         
         gameState.inBattle = false;
-        gameState.mode = "normal";
+        gameState.mode = "town";
         gameState.enemy = null;
         gameState.isProcessingTurn = false;
 
@@ -744,85 +879,54 @@ export function confirmDefeat() {
     autoSave();
 }
 
-// src/logic.js 的 rest 函式 (安全休息版)
-
-export function rest() {
-    if (!gameState.canAct || !player.alive || gameState.inBattle || gameState.merchantActive) return;
-    
-    // 檢查飢餓
-    let hungerCost = 20;
-    let isStarving = player.hunger < hungerCost;
-
-    UI.addLog("😴 你回到安全的旅店休息……");
-    startCooldown(COOLDOWNS.REST);
-    
-    setTimeout(() => {
-        if (!player.alive) return;
-        
-        try {
-            let hpChange = 0;
-
-            // 1. 飢餓判定 (餓肚子會扣血，但不致死，因為後面會補回來)
-            if (isStarving) {
-                player.hunger = 0; 
-                hpChange -= 10; 
-                UI.addLog("⚠️ 肚子太餓了，睡得不好... (HP -10)", "log-critical");
-            } else { 
-                player.hunger -= hungerCost; 
-            }
-
-            // 2. 移除偷襲事件 (城鎮休息是絕對安全的)
-            // (原本這裡有的 startBattle 代碼已刪除)
-
-            // 3. 計算恢復量
-            // 基礎恢復量
-            let healHP = 20 + player.con * 2; 
-            let healMP = 10 + player.int * 2;
-
-            // 如果飢餓，恢復效果減半
-            if (isStarving) { 
-                healHP = Math.floor(healHP / 2); 
-                healMP = Math.floor(healMP / 2);
-            }
-
-            // 4. 結算 HP (先扣飢餓傷，再補血，確保淨值是正的)
-            // 例如：飢餓(-10) + 補血(+20) = 實際 +10，這樣就不會死了
-            hpChange += healHP;
-
-            player.hp = Math.min(player.maxHP, player.hp + hpChange);
-            player.mp = Math.min(player.maxMP, player.mp + healMP);
-
-            // 5. ✨ 關鍵修正：解除負面狀態 ✨
-            if (player.state === "中毒" || player.state === "重傷") {
-                player.state = "正常";
-                UI.addLog("✨ 經過休息，你的身體狀況恢復了正常。", "log-system");
-            }
-
-            addExp(5);
-            UI.addLog(`休息後恢復了體力與傷口`);
-            
-            // 推進天數
-            advanceDay();
-            UI.updateStatus();
-            
-            // 刷新畫面
-            if (!gameState.inBattle) UI.renderMainScreen();
-            
-            autoSave();
-
-        } catch (e) {
-            console.error("休息邏輯錯誤", e);
-            UI.addLog(`❌ 休息時發生錯誤: ${e.message}`, "log-critical");
-        }
-    }, COOLDOWNS.REST * 1000);
-}
-
 export function confirmName() { const input = document.getElementById("nameInput"); player.name = input.value.trim() || "無名冒險者"; document.getElementById("namePanel").style.display = "none"; document.getElementById("jobPanel").style.display = "block"; }
-export function chooseJob(jobKey) { player.str = 0; player.agi = 0; player.con = 0; player.int = 0; player.equipment = { head: null, body: null, weapon: null, accessory: null }; player.learnedSkills = []; player.equippedSkills = []; if (jobKey === "warrior") { player.job = "戰士"; player.str = 5; player.con = 5; player.learnedSkills.push("s_bash"); player.equippedSkills.push("s_bash"); } else if (jobKey === "archer") { player.job = "弓箭手"; player.agi = 6; player.str = 2; player.int = 2; player.learnedSkills.push("s_double_shot"); player.equippedSkills.push("s_double_shot"); } else if (jobKey === "rogue") { player.job = "盜賊"; player.str = 3; player.agi = 5; player.int = 2; player.learnedSkills.push("s_backstab"); player.equippedSkills.push("s_backstab"); } else if (jobKey === "mage") { player.job = "法師"; player.int = 8; player.con = 1; player.agi = 1; player.learnedSkills.push("s_fireball"); player.equippedSkills.push("s_fireball"); } 
-    player.gold = 100; stash.length = 0; stash.push({ ...CONSUMABLES[0], count: 3 });
+export function chooseJob(jobKey) { 
+    // 1. 重置玩家屬性與裝備
+    player.str = 0; player.agi = 0; player.con = 0; player.int = 0; 
+    player.equipment = { head: null, body: null, weapon: null, accessory: null }; 
+    player.learnedSkills = []; 
+    player.equippedSkills = []; 
+
+    // 2. 根據職業設定初始值
+    if (jobKey === "warrior") { 
+        player.job = "戰士"; 
+        player.str = 5; 
+        player.con = 5; 
+        player.learnedSkills.push("s_bash"); 
+        player.equippedSkills.push("s_bash"); 
+    } else if (jobKey === "archer") { 
+        player.job = "弓箭手"; 
+        player.agi = 6; 
+        player.str = 2; 
+        player.int = 2; 
+        player.learnedSkills.push("s_double_shot"); 
+        player.equippedSkills.push("s_double_shot"); 
+    } else if (jobKey === "rogue") { 
+        player.job = "盜賊"; 
+        player.str = 3; 
+        player.agi = 5; 
+        player.int = 2; 
+        player.learnedSkills.push("s_backstab"); 
+        player.equippedSkills.push("s_backstab"); 
+    } else if (jobKey === "mage") { 
+        player.job = "法師"; 
+        player.int = 8; 
+        player.con = 1; 
+        player.agi = 1; 
+        player.learnedSkills.push("s_fireball"); 
+        player.equippedSkills.push("s_fireball"); 
+    } 
+    
+    // 3. 設定初始金錢與物品
+    player.gold = 100; 
+    stash.items = [];
+    stash.gold = 0;
+    stash.items.push({ ...CONSUMABLES[0], count: 3 });
+
+    // 4. 更新 UI 並開始遊戲
     UI.updateInventory(); UI.updateStash();
-    player.hp = player.maxHP; player.mp = player.maxMP; UI.updateStatus(); player.hp = player.maxHP; player.mp = player.maxMP; UI.updateStatus(); document.getElementById("overlay").style.display = "none"; UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
+    player.hp = player.maxHP; player.mp = player.maxMP; UI.updateStatus(); document.getElementById("overlay").style.display = "none"; UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
     UI.addLog(`獲得新手資助：100 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
-    gameState.mode = "normal"; gameState.canAct = true; UI.renderMainScreen(); UI.showMainActions(); autoSave(); 
+    gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); UI.showMainActions(); autoSave(); 
 }
 export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
