@@ -179,7 +179,7 @@ export function updateInventory() {
     const equipHtml = renderEquipmentPanel();
     box.innerHTML = `
         <div class="inv-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>🎒 背包（${inventory.length}）</span>
+            <span>🎒 背包（${inventory.length}/${player.inventoryMaxSlots}）</span>
             <span style="font-size: 16px; color: #f1c40f; font-weight: bold; margin-right: 10px;">💰 ${player.gold} G</span>
         </div>
         ${equipHtml}

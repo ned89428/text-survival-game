@@ -143,16 +143,59 @@ export function toggleInventory() { }
 
 // ================== 物品與倉庫系統 (完整補上) ==================
 export function addToInventory(newItem) {
+    let amountToAdd = newItem.count || 1;
+
+    // 1. For stackable items, try to add to existing stacks first.
     if (newItem.stackable) {
-        const existingItem = inventory.find(i => i.id === newItem.id);
-        if (existingItem) {
-            if (!existingItem.count) existingItem.count = 1;
-            existingItem.count++;
-            return;
+        // Find the definition of the item to get its maxStack.
+        // This is a bit inefficient to do every time, but robust.
+        let itemDef = CONSUMABLES.find(c => c.id === newItem.id);
+        
+        // Handle materials which are not in CONSUMABLES but are stackable.
+        if (!itemDef && newItem.id === 'mat_common') {
+            itemDef = { maxStack: 20 }; // Default stack for common materials.
         }
+        
+        const maxStack = itemDef ? itemDef.maxStack : 1; // Default to 1 if no definition found.
+
+        // First pass: Fill up existing, non-full stacks.
+        for (const existingItem of inventory) {
+            if (amountToAdd <= 0) break; // Stop if we've added all items.
+            if (existingItem.id === newItem.id && existingItem.count < maxStack) {
+                const spaceLeft = maxStack - existingItem.count;
+                const canAdd = Math.min(amountToAdd, spaceLeft);
+                
+                existingItem.count += canAdd;
+                amountToAdd -= canAdd;
+            }
+        }
+
+        // Second pass: Use new slots if there are remaining items.
+        while (amountToAdd > 0) {
+            if (inventory.length >= player.inventoryMaxSlots) {
+                UI.addLog("🎒 背包已滿！無法再放入更多物品。", "log-system");
+                return; // Inventory is full.
+            }
+
+            const amountForNewStack = Math.min(amountToAdd, maxStack);
+            
+            // Create a new item stack.
+            inventory.push({
+                ...newItem,
+                count: amountForNewStack
+            });
+            
+            amountToAdd -= amountForNewStack;
+        }
+
+    } else { // 2. For non-stackable items (like equipment).
+        if (inventory.length >= player.inventoryMaxSlots) {
+            UI.addLog("🎒 背包已滿！無法放入新物品。", "log-system");
+            return; // Inventory is full.
+        }
+        // Non-stackable items always take a new slot.
+        inventory.push({ ...newItem, count: 1 });
     }
-    newItem.count = 1;
-    inventory.push(newItem);
 }
 
 // ✨ 補上遺失的 moveToStash ✨

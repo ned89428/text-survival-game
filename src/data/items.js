@@ -42,7 +42,7 @@ export const ITEM_PREFIXES = [
 // 3. 消耗品 (Consumables)
 export const CONSUMABLES = [
     { 
-        id: "food_ration", name: "乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 15, stackable: true,
+        id: "food_ration", name: "乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 15, stackable: true, maxStack: 10,
         effects: [
             { target: "hunger", value: 30 },
         ],
@@ -51,7 +51,7 @@ export const CONSUMABLES = [
     },
 
         { 
-        id: "food_ration_large", name: "大乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 30, stackable: true,
+        id: "food_ration_large", name: "大乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 30, stackable: true, maxStack: 10,
         effects: [
             { target: "hunger", value: 60 },
         ],
@@ -59,7 +59,7 @@ export const CONSUMABLES = [
         chance: 20 // ✨ 新增：出現權重 (數字越小越稀有)
     },
     { 
-        id: "potion_heal_s", name: "小回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 50, stackable: true,
+        id: "potion_heal_s", name: "小回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 50, stackable: true, maxStack: 5,
         effects: [
             { target: "hp", value: 50 }
         ],
@@ -67,7 +67,7 @@ export const CONSUMABLES = [
         chance: 30
     },
     { 
-        id: "potion_heal_m", name: "回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 120, stackable: true,
+        id: "potion_heal_m", name: "回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 120, stackable: true, maxStack: 5,
         effects: [
             { target: "hp", value: 150 }
         ],
@@ -75,7 +75,7 @@ export const CONSUMABLES = [
         chance: 10
     },
     { 
-        id: "potion_mana_s", name: "小魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 60, stackable: true,
+        id: "potion_mana_s", name: "小魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 60, stackable: true, maxStack: 5,
         effects: [
             { target: "mp", value: 30 }
         ],
@@ -83,11 +83,11 @@ export const CONSUMABLES = [
         chance: 30
     },
     { 
-        id: "potion_mana_m", name: "魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 150, stackable: true,
+        id: "potion_mana_m", name: "魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 150, stackable: true, maxStack: 5,
         effects: [
             { target: "mp", value: 100 }
         ],
         desc: "恢復 100 MP。",
         chance: 10
     }
-]; 
+];

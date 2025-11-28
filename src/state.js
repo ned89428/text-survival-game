@@ -3,6 +3,7 @@
 // 1. 玩家資料
 export let player = {
     name: "", job: "", day: 1, level: 1, exp: 0, expToLevel: 100, attrPoints: 0,
+    inventoryMaxSlots: 6, // 背包容量
     str: 0, agi: 0, con: 0, int: 0,
     equipment: { head: null, body: null, weapon: null, accessory: null },
     learnedSkills: [], equippedSkills: [],
