@@ -153,8 +153,6 @@ export function updateStatus() {
             ${createBar("HP", "❤️", player.hp, player.maxHP, "red-bar")}
             ${createBar("MP", "💧", player.mp, player.maxMP, "blue-bar")}
             ${createBar("飢餓", "🍗", player.hunger, player.hungerMax, "yellow-bar")}
-            ${createBar("體力", "⚡", player.energy, player.energyMax, "green-bar")}
-            <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
                 <div class="small-label">物理攻擊：${Math.floor(player.atk)}</div>
                 <div class="small-label">魔法攻擊：${Math.floor(player.magicAtk)}</div>
                 <div class="small-label">物理防禦：${Math.floor(player.def)}</div>
@@ -201,10 +199,7 @@ export function updateInventory() {
 
             let statsDesc = "";
             if (item.type === "equip") statsDesc = `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(item.stats)}</div>`;
-            else if (item.type === "heal") statsDesc = `<div style="font-size:12px; color:#00b894; margin-top:2px;">恢復 HP ${item.value}</div>`;
-            else if (item.type === "mana") statsDesc = `<div style="font-size:12px; color:#0984e3; margin-top:2px;">恢復 MP ${item.value}</div>`;
-            else if (item.type === "food") statsDesc = `<div style="font-size:12px; color:#e17055; margin-top:2px;">恢復飢餓 ${item.value}</div>`;
-            else if (item.type === "material") statsDesc = `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">用於交易或製作</div>`;
+            else if (item.desc) statsDesc = `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${item.desc}</div>`;
 
             let countDisplay = (item.count && item.count > 1) ? `<span style="font-weight:bold; color:#fff; margin-left:5px;">x${item.count}</span>` : "";
 

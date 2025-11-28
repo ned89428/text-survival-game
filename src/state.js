@@ -7,7 +7,7 @@ export let player = {
     equipment: { head: null, body: null, weapon: null, accessory: null },
     learnedSkills: [], equippedSkills: [],
     hp: 100, maxHP: 100, mp: 10, maxMP: 10,
-    hunger: 100, hungerMax: 100, energy: 100, energyMax: 100,
+    hunger: 100, hungerMax: 100,
     atk: 5, magicAtk: 0, def: 0, dodge: 5, hitRate: 90, speed: 5, critChance: 5,
     gold: 0, state: "正常", alive: true
 };
@@ -66,14 +66,14 @@ export function recalcDerivedStats() {
     player.atk += bonusAtk; player.magicAtk += bonusMagic;
     player.maxHP = 50 + (effCon * hpMod) + (player.level * 5) + bonusHP;
     player.maxMP = 20 + (effInt * mpMod) + (player.level * 2);
-    player.hungerMax = 100 + effCon * 5; player.energyMax = 100 + effCon * 5;
+    player.hungerMax = 100 + effCon * 5;
     player.def = (effCon * defMod) + bonusDef;
     let rawDodge = effAgi * 0.5; player.dodge = Math.min(60, rawDodge); player.hitRate = 80 + (effAgi * 0.5); 
     player.critChance = 5 + (effInt * 0.2) + (effAgi * 0.1); player.speed = 10 + effAgi * 1;
 
     applyStateBonuses();
     player.hp = Math.min(player.hp, player.maxHP); player.mp = Math.min(player.mp || 0, player.maxMP);
-    player.energy = Math.min(player.energy, player.energyMax); player.hunger = Math.min(player.hunger, player.hungerMax);
+    player.hunger = Math.min(player.hunger, player.hungerMax);
 }
 
 // ==========================================
@@ -87,7 +87,7 @@ export function resetGameData() {
     player.equipment = { head: null, body: null, weapon: null, accessory: null };
     player.learnedSkills = []; player.equippedSkills = [];
     player.hp = 100; player.maxHP = 100; player.mp = 10; player.maxMP = 10;
-    player.hunger = 100; player.hungerMax = 100; player.energy = 100; player.energyMax = 100;
+    player.hunger = 100; player.hungerMax = 100;
     player.atk = 5; player.magicAtk = 0; player.def = 0; player.dodge = 0; player.hitRate = 80; player.speed = 5; player.critChance = 5;
     player.gold = 0; player.state = "正常"; player.alive = true;
 

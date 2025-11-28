@@ -12,7 +12,7 @@ function autoSave() {
     if (!player.alive && player.day > 1) { }
     const data = { 
         player, inventory, stash, 
-        gameState: { ...gameState, inBattle: false, enemy: null, isProcessingTurn: false, logs: gameState.logs }, 
+        gameState: { ...gameState, isProcessingTurn: false }, // 只重置處理鎖，保留戰鬥狀態
         stats 
     };
     localStorage.setItem('LegendSurvival_Save', JSON.stringify(data));
@@ -114,7 +114,21 @@ export function addExp(amount) {
 }
 function levelUp() {
     player.level++; player.attrPoints += 5; player.hp = player.maxHP; player.mp = player.maxMP;
-    UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system"); autoSave();
+    UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
+
+    // === 新增：升級時自動學習技能 ===
+    SKILLS.forEach(skill => {
+        // 檢查 職業符合、等級達到、且尚未學過
+        if (skill.job === player.job && player.level >= skill.minLvl && !player.learnedSkills.includes(skill.id)) {
+            player.learnedSkills.push(skill.id);
+            // 預設自動裝備到前幾個技能欄 (如果需要)
+            if (player.equippedSkills.length < 4) { // 假設最多裝備4個技能
+                player.equippedSkills.push(skill.id);
+            }
+            UI.addLog(`💡 你學會了新技能：${skill.name}！`, "log-system");
+        }
+    });
+    autoSave();
 }
 export function toggleInventory() { }
 
@@ -200,10 +214,43 @@ export function equipItem(index) { const item = inventory[index]; if (!item || i
 export function unequipItem(slot) { const item = player.equipment[slot]; if (!item) return; player.equipment[slot] = null; addToInventory(item); UI.addLog(`你卸下了 ${item.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
 export function useItem(i) { 
     const item = inventory[i]; 
-    if (item.type === "equip") { equipItem(i); return; } 
-    let used = false; 
-    if (item.type === "heal") { if (player.hp >= player.maxHP) { UI.addLog("HP 已經滿了。", "log-system"); return; } player.hp = Math.min(player.maxHP, player.hp + item.value); UI.addLog(`🧪 使用 ${item.name}，恢復 ${item.value} HP！`); used = true; } else if (item.type === "food") { if (player.hunger >= player.hungerMax) { UI.addLog("還不餓。", "log-system"); return; } player.hunger = Math.min(player.hungerMax, player.hunger + item.value); UI.addLog(`🍱 吃掉 ${item.name}，恢復 ${item.value} 飢餓！`); used = true; } else if (item.type === "mana") { if (player.mp >= player.maxMP) { UI.addLog("MP 已經滿了。", "log-system"); return; } player.mp = Math.min(player.maxMP, player.mp + item.value); UI.addLog(`🧪 使用 ${item.name}，恢復 ${item.value} MP！`); used = true; } 
-    if (used && item.type !== "equip") { if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateStatus(); UI.updateInventory(); autoSave(); } 
+    if (!item || !item.usable) return;
+
+    if (item.type === "equip") { 
+        equipItem(i); 
+        return; 
+    } 
+
+    if (item.type === "consumable" && item.effects) {
+        let effectApplied = false;
+        let logMessages = [];
+
+        for (const effect of item.effects) {
+            const { target, value } = effect;
+            const targetMax = player[target + 'Max'];
+
+            if (player[target] >= targetMax) {
+                // 如果是單一效果且已滿，則提示並中止
+                if (item.effects.length === 1) {
+                    const targetName = { hp: "HP", mp: "MP", hunger: "飢餓" }[target] || target;
+                    UI.addLog(`${targetName} 已經滿了。`, "log-system");
+                    return;
+                }
+                continue; // 如果是多重效果，跳過已滿的屬性
+            }
+            
+            player[target] = Math.min(targetMax, player[target] + value);
+            const targetName = { hp: "HP", mp: "MP", hunger: "飢餓" }[target] || target;
+            logMessages.push(`恢復 ${value} ${targetName}`);
+            effectApplied = true;
+        }
+
+        if (effectApplied) {
+            UI.addLog(`你使用了 ${item.name}：${logMessages.join("，")}。`, "log-system");
+            if (item.count > 1) item.count--; else inventory.splice(i, 1);
+            UI.updateStatus(); UI.updateInventory(); autoSave();
+        }
+    }
 }
 export function sellOneItem(i) { if (!gameState.merchantActive) { UI.addLog("需在商人處才能出售。"); return; } const item = inventory[i]; if (!item.sellPrice) return; player.gold += item.sellPrice; UI.addLog(`賣出 ${item.name} (+${item.sellPrice} G)`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateStatus(); UI.updateInventory(); renderMerchantUI(`你賣掉了 ${item.name} (+${item.sellPrice} G)`); autoSave(); }
 export function dropItem(i) { const item = inventory[i]; UI.addLog(`丟棄了 ${item.name}`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateInventory(); autoSave(); }
@@ -253,8 +300,7 @@ export function sellAllMaterials() {
     else { UI.addLog("沒有素材可賣", "log-system"); }
 }
 
-// 👇👇👇 你原本可能漏掉或沒 export 這個 👇👇👇
-export function closeMerchant() {
+export function closeMerchant() { // 👈 確保這裡有 export
     gameState.merchantActive = false; 
     gameState.merchantGoods = []; 
     gameState.mode = "normal"; // 切回正常模式
@@ -274,12 +320,11 @@ function startCooldown(seconds) {
     }, 1000);
 }
 
-function canDoExplore(costHunger, costEnergy) {
+function canDoExplore(costHunger) {
     if (!player.alive || !gameState.canAct || gameState.inBattle || gameState.merchantActive) return false;
     
     let failed = false;
     if (player.hunger <= 0) { player.hp -= 15; UI.addLog("⚠️ 肚子餓扁了還強行探索... HP -15", "log-critical"); failed = true; } else { player.hunger = Math.max(0, player.hunger - costHunger); }
-    if (player.energy <= 0) { player.hp -= 10; UI.addLog("⚠️ 累得要死還強行探索... HP -10", "log-critical"); failed = true; } else { player.energy = Math.max(0, player.energy - costEnergy); }
     
     if (failed) {
         gameState.enemy = { name: "身體極限", emoji: "😫", hp: player.hp, maxHp: player.maxHP, atk: 0 };
@@ -293,9 +338,9 @@ function canDoExplore(costHunger, costEnergy) {
     UI.updateStatus(); return true;
 }
 
-export function exploreNearby() { if (!canDoExplore(5, 5)) return; stats.exploredNearby++; UI.addLog("🔍 你在附近小心搜索……"); startCooldown(COOLDOWNS.NEARBY); setTimeout(() => { if (player.alive) { resolveNearby(); advanceDay(); } }, COOLDOWNS.NEARBY * 1000); }
-export function exploreDungeon() { if (!canDoExplore(10, 15)) return; stats.exploredDungeon++; UI.addLog("🕳️ 你走入陰暗的地下城……"); startCooldown(COOLDOWNS.DUNGEON); setTimeout(() => { if (player.alive) { resolveDungeon(); advanceDay(); } }, COOLDOWNS.DUNGEON * 1000); }
-export function exploreExpedition() { if (!canDoExplore(25, 30)) return; stats.exploredExpedition++; UI.addLog("🏕️ 你踏上長時間遠征……"); startCooldown(COOLDOWNS.EXPEDITION); setTimeout(() => { if (player.alive) { resolveExpedition(); advanceDay(); } }, COOLDOWNS.EXPEDITION * 1000); }
+export function exploreNearby() { if (!canDoExplore(5)) return; stats.exploredNearby++; UI.addLog("🔍 你在附近小心搜索……"); startCooldown(COOLDOWNS.NEARBY); setTimeout(() => { if (player.alive) { resolveNearby(); advanceDay(); } }, COOLDOWNS.NEARBY * 1000); }
+export function exploreDungeon() { if (!canDoExplore(10)) return; stats.exploredDungeon++; UI.addLog("🕳️ 你走入陰暗的地下城……"); startCooldown(COOLDOWNS.DUNGEON); setTimeout(() => { if (player.alive) { resolveDungeon(); advanceDay(); } }, COOLDOWNS.DUNGEON * 1000); }
+export function exploreExpedition() { if (!canDoExplore(25)) return; stats.exploredExpedition++; UI.addLog("🏕️ 你踏上長時間遠征……"); startCooldown(COOLDOWNS.EXPEDITION); setTimeout(() => { if (player.alive) { resolveExpedition(); advanceDay(); } }, COOLDOWNS.EXPEDITION * 1000); }
 
 function resolveNearby() { if (gameState.enemy && gameState.enemy.name === "身體極限") gameState.enemy = null; if (maybeMerchant("nearby")) return; const r = Math.random(); addExp(10); if (r < 0.4) startBattle("nearby", 1); else if (r < 0.8) lootRandomItem("food"); else lootRandomItem("material"); }
 function resolveDungeon() { if (gameState.enemy && gameState.enemy.name === "身體極限") gameState.enemy = null; if (maybeMerchant("dungeon")) return; const r = Math.random(); addExp(20); if (r < 0.8) startBattle("dungeon", 2); else lootRandomItem("treasure"); }
@@ -682,14 +727,12 @@ export function rest() {
             // 3. 計算恢復量
             // 基礎恢復量
             let healHP = 20 + player.con * 2; 
-            let healMP = 10 + player.int * 2; 
-            let healEnergy = 25 + player.con * 2;
+            let healMP = 10 + player.int * 2;
 
             // 如果飢餓，恢復效果減半
             if (isStarving) { 
                 healHP = Math.floor(healHP / 2); 
-                healMP = Math.floor(healMP / 2); 
-                healEnergy = Math.floor(healEnergy / 2); 
+                healMP = Math.floor(healMP / 2);
             }
 
             // 4. 結算 HP (先扣飢餓傷，再補血，確保淨值是正的)
@@ -698,7 +741,6 @@ export function rest() {
 
             player.hp = Math.min(player.maxHP, player.hp + hpChange);
             player.mp = Math.min(player.maxMP, player.mp + healMP);
-            player.energy = Math.min(player.energyMax, player.energy + healEnergy);
 
             // 5. ✨ 關鍵修正：解除負面狀態 ✨
             if (player.state === "中毒" || player.state === "重傷") {

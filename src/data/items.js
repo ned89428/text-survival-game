@@ -41,8 +41,39 @@ export const ITEM_PREFIXES = [
 
 // 3. 消耗品 (Consumables)
 export const CONSUMABLES = [
-    { id: "c_food_1", name: "乾糧包", type: "food", emoji: "🍞", value: 30, price: 20, usable: true, stackable: true },
-    { id: "c_heal_1", name: "輕型治療藥水", type: "heal", emoji: "🧴", value: 30, price: 25, usable: true, stackable: true },
-    { id: "c_heal_2", name: "高級治療藥水", type: "heal", emoji: "💉", value: 80, price: 60, usable: true, stackable: true },
-    { id: "c_mana_1", name: "法力藥水", type: "mana", emoji: "🧪", value: 20, price: 30, usable: true, stackable: true }
-];
+{ 
+        id: "food_ration", name: "乾糧包", emoji: "🍱", type: "consumable", usable: true, price: 15, stackable: true,
+        effects: [
+            { target: "hunger", value: 30 },
+        ],
+        desc: "恢復 30 飢餓。"
+    },
+    { 
+        id: "potion_heal_s", name: "小回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 50, stackable: true,
+        effects: [
+            { target: "hp", value: 50 }
+        ],
+        desc: "恢復 50 HP。"
+    },
+    { 
+        id: "potion_heal_m", name: "回復藥水", emoji: "🧪", type: "consumable", usable: true, price: 120, stackable: true,
+        effects: [
+            { target: "hp", value: 150 }
+        ],
+        desc: "恢復 150 HP。"
+    },
+    { 
+        id: "potion_mana_s", name: "小魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 60, stackable: true,
+        effects: [
+            { target: "mp", value: 30 }
+        ],
+        desc: "恢復 30 MP。"
+    },
+    { 
+        id: "potion_mana_m", name: "魔力藥水", emoji: "💧", type: "consumable", usable: true, price: 150, stackable: true,
+        effects: [
+            { target: "mp", value: 100 }
+        ],
+        desc: "恢復 100 MP。"
+    }
+]; 

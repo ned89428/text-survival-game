@@ -57,5 +57,17 @@ export const SKILLS = [
         dmgScale: 1.5, 
         speedMod: 0, // 普通速度
         desc: "消耗 15 MP，造成 150% 無視防禦傷害。"
+    },
+    {
+        id: "s_ice_storm",
+        name: "冰風暴",
+        job: "法師",
+        minLvl: 5,
+        type: "magic",
+        costType: "mp",
+        cost: 20,
+        dmgScale: 2.0,
+        speedMod: -2, // 比火球術慢
+        desc: "消耗 20 MP，造成 200% 無視防禦傷害 (速度 -2)。"
     }
 ];
