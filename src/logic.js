@@ -678,8 +678,9 @@ export function closeTrainingGround() {
 
 export function trainAttribute(attribute) {
     if (gameState.mode !== 'training') return;
-
-    const cost = 0; // 根據要求，價格暫時為 0
+    
+    // 根據要求，價格暫時為 0
+    const cost = 0;
 
     if (player.gold < cost) {
         UI.addLog(`金錢不足，你需要 ${cost} G。`, "log-system");
@@ -689,7 +690,12 @@ export function trainAttribute(attribute) {
     player.gold -= cost;
     player[attribute]++; // 直接增加對應屬性
     UI.addLog(`訓練成功！你的 ${attribute.toUpperCase()} 提升了。`, "log-system");
-    UI.updateStatus();
+
+    // ✨ 核心修正：如果訓練的是體質或智慧，則在更新狀態時直接補滿
+    const shouldRefill = (attribute === 'con' || attribute === 'int');
+    UI.updateStatus(shouldRefill);
+
+    UI.renderMainScreen(); // 重新渲染以更新價格
     autoSave();
 }
 
@@ -893,24 +899,35 @@ function startBossBattle(bossId) {
     const finalLvl = Math.max(template.minLvl, player.level);
 
     gameState.enemy = {
-        id: template.id,
-        name: template.name,
-        emoji: template.emoji,
+        ...template, // 複製範本所有屬性
         lvl: finalLvl,
         hp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2)),
         maxHp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2)),
         atk: Math.floor(template.baseAtk * (1 + (finalLvl - template.minLvl) * 0.15)),
         def: Math.floor(template.baseDef + (finalLvl - template.minLvl) * 1),
-        exp: template.exp,
-        dropRate: 1.0,
-        dodge: 0,
-        speed: template.speed || 10,
-        killChance: template.killChance !== undefined ? template.killChance : 1.0,
+        // 新增：計算衍生屬性
+        hitRate: 80 + (finalLvl * 1) + ((template.baseTec || 0) * 1.5),
+        dodge: (finalLvl * 0.8) + ((template.baseAgi || 0) * 1.5),
+        critChance: 5 + ((template.baseTec || 0) * 0.2),
+        critDamage: 150 + ((template.baseStr || 0) * 0.3),
+        speed: (template.baseSpeed || 10) + ((template.baseAgi || 0) * 0.1),
         isBoss: true 
     };
+    gameState.enemy.actionGauge = 0; // 初始化敵人行動條
+
+    // 確保 killChance 存在
+    if (gameState.enemy.killChance === undefined) {
+        gameState.enemy.killChance = 1.0;
+    }
+
+    // 確保 dropRate 存在
+    if (gameState.enemy.dropRate === undefined) {
+        gameState.enemy.dropRate = 1.0;
+    }
 
     UI.addBattleLog(`⚠️ 警告：${gameState.enemy.name} 出現了！`, "log-critical");
     UI.renderMainScreen();
+    startInstantBattle(); // 啟動「瞬間 ATB」戰鬥
 }
 
 function startBattle(zone, difficulty = 1) {
@@ -927,66 +944,129 @@ function startBattle(zone, difficulty = 1) {
     const diffMod = 1 + (difficulty * 0.2); 
     const finalLvl = Math.max(template.minLvl, player.level);
 
+    // 根據新公式，重新計算敵人數值
     gameState.enemy = {
-        name: template.name,
-        emoji: template.emoji || "👾",
+        ...template, // 複製範本所有屬性
         lvl: finalLvl,
         hp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2) * diffMod),
         maxHp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2) * diffMod),
         atk: Math.floor(template.baseAtk * (1 + (finalLvl - template.minLvl) * 0.15) * diffMod),
         def: Math.floor(template.baseDef + (finalLvl - template.minLvl) * 1),
         exp: Math.floor(template.exp * (1 + (finalLvl - template.minLvl) * 0.1)),
-        dropRate: template.dropRate || 0.1,
-        dodge: template.dodge || 0,
-        speed: 10 + finalLvl,
-        killChance: template.killChance !== undefined ? template.killChance : 0.1 
+        // 新增：計算衍生屬性
+        hitRate: 80 + (finalLvl * 1) + ((template.baseTec || 0) * 1.5),
+        dodge: (finalLvl * 0.8) + ((template.baseAgi || 0) * 1.5),
+        critChance: 5 + ((template.baseTec || 0) * 0.2),
+        critDamage: 150 + ((template.baseStr || 0) * 0.3),
+        speed: (template.baseSpeed || 10) + ((template.baseAgi || 0) * 0.1),
     };
+    gameState.enemy.actionGauge = 0; // 初始化敵人行動條
+
+    // 確保 killChance 存在
+    if (gameState.enemy.killChance === undefined) {
+        gameState.enemy.killChance = 0.1;
+    }
 
     UI.addBattleLog(`遭遇敵人：${gameState.enemy.name} (Lv.${gameState.enemy.lvl})`, "log-battle");
     UI.renderMainScreen();
+    startInstantBattle(); // 啟動「瞬間 ATB」戰鬥
+}
+
+// ================== 瞬間 ATB 戰鬥系統核心 ==================
+
+function startInstantBattle() {
+    // 初始化玩家和敵人的行動條
+    player.actionGauge = 0;
+    if (gameState.enemy) gameState.enemy.actionGauge = 0;
+    gameState.isPlayerTurn = false;
+    gameState.lastActor = null; // ✨ 戰鬥開始時，清除上回合行動記錄
+    
+    // 戰鬥開始，直接決定誰先行動
+    processNextTurn();
+}
+
+async function processNextTurn() {
+    if (!gameState.inBattle || !player.alive || !gameState.enemy || gameState.enemy.hp <= 0) {
+        return;
+    }
+
+    // 核心邏輯：計算誰先達到 100 行動值
+    // 避免除以零的錯誤
+    const playerSpeed = Math.max(1, player.speed);
+    const enemySpeed = Math.max(1, gameState.enemy.speed);
+
+    // 計算還需要多少 "tick" 才能滿 100
+    const playerTicksNeeded = (100 - player.actionGauge) / playerSpeed;
+    const enemyTicksNeeded = (100 - gameState.enemy.actionGauge) / enemySpeed;
+
+    if (playerTicksNeeded <= enemyTicksNeeded) {
+        // 輪到玩家行動
+        // 推進時間，讓敵人的行動條也增加
+        // ✨ 新增：檢查是否為玩家連擊
+        if (gameState.lastActor === 'player') {
+            UI.addLog("⚡️ 你的速度壓制了對手，獲得了連擊機會！", "log-system");
+        }
+
+        // 核心修正：推進雙方時間，而不是只補滿一方
+        player.actionGauge += playerTicksNeeded * playerSpeed; // 玩家行動條剛好達到 100+
+        gameState.enemy.actionGauge += playerTicksNeeded * enemySpeed; // 敵人行動條也同步推進
+
+        gameState.isPlayerTurn = true;
+        UI.renderMainScreen(); // 更新UI，解鎖按鈕
+    } else {
+        // 輪到敵人行動
+        // 推進時間，讓玩家的行動條也增加
+        // ✨ 新增：檢查是否為敵人連擊 (讓戰鬥更刺激)
+        if (gameState.lastActor === 'enemy') {
+            UI.addLog("🐢 敵人動作迅猛，對你發動了連續攻擊！", "log-critical");
+        }
+
+        // 核心修正：推進雙方時間
+        player.actionGauge += enemyTicksNeeded * playerSpeed;
+        gameState.enemy.actionGauge += enemyTicksNeeded * enemySpeed; // 敵人行動條剛好達到 100+
+
+        gameState.isProcessingTurn = true;
+        UI.renderMainScreen(); // 先更新一次畫面，顯示敵人行動前的狀態
+        await wait(400); // 給一個短暫的延遲，讓玩家能反應
+        const playerDied = await doEnemyMove();
+        gameState.isProcessingTurn = false;
+
+        // 如果玩家沒死，敵人行動完後，立刻計算下一回合
+        if (!playerDied) {
+            processNextTurn();
+        }
+    }
 }
 
 export async function handleCombat(action, skillId = null) {
-    if (!gameState.inBattle || !player.alive || gameState.isProcessingTurn) return;
-    if (action === 'run') { runAway(); return; }
+    // ATB 系統下，只有輪到玩家才能行動
+    if (!gameState.inBattle || !player.alive || !gameState.isPlayerTurn) return;
+    if (action === 'run') { 
+        await runAway(); // runAway 也可能需要時間
+        return; 
+    }
 
-    let playerSpeed = player.speed;
-    let speedMod = 0;
-    let cost = 0;
-
+    // 檢查 MP 是否足夠
     if (action === 'skill' && skillId) {
         const skill = SKILLS.find(s => s.id === skillId);
         if (!skill) return;
         if (player.mp < skill.cost) { UI.addLog("MP 不足！無法施放技能。", "log-system"); return; }
-        cost = skill.cost; speedMod = skill.speedMod || 0;
     }
 
-    gameState.isProcessingTurn = true; 
-    UI.renderMainScreen(); 
+    // 鎖定玩家回合，執行動作
+    gameState.isPlayerTurn = false;
+    gameState.isProcessingTurn = true; // 標記為正在處理，防止敵人同時行動
 
-    let finalPlayerSpeed = playerSpeed + speedMod + Math.random() * 2;
-    let enemySpeed = gameState.enemy.speed + Math.random() * 2;
-    const playerGoesFirst = finalPlayerSpeed >= enemySpeed;
+    // 執行玩家動作，並等待其完成
+    const enemyDied = await doPlayerMove(action, skillId);
+    player.actionGauge -= 100; // 核心修正：行動後只扣除100，保留溢出值
+    gameState.lastActor = 'player'; // ✨ 記錄本次行動者為玩家
 
-    if (playerGoesFirst) {
-        UI.addLog(`⚡ 你動作較快！`, "log-system");
-        const enemyDied = await doPlayerMove(action, skillId);
-        if (!enemyDied && gameState.inBattle) {
-            await wait(600);
-            await doEnemyMove();
-        }
-    } else {
-        UI.addLog(`🐢 敵人動作較快！`, "log-system");
-        const playerDied = await doEnemyMove();
-        if (!playerDied && gameState.inBattle) {
-            await wait(600);
-            await doPlayerMove(action, skillId);
-        }
-    }
+    gameState.isProcessingTurn = false; // 解除處理鎖
 
-    if (gameState.inBattle && player.alive && gameState.enemy) {
-        gameState.isProcessingTurn = false;
-        UI.renderMainScreen();
+    // 如果敵人沒死，玩家行動完後，立刻計算下一回合
+    if (!enemyDied) {
+        processNextTurn();
     }
 }
 
@@ -994,18 +1074,10 @@ async function doPlayerMove(action, skillId) {
     if (!gameState.inBattle || !player.alive) return false;
     const enemy = gameState.enemy;
 
-    let enemyDodge = (enemy.dodge || 0) + (enemy.lvl * 0.5);
-    let hitChance = (player.hitRate + 10) - enemyDodge;
-
+    // 消耗 MP
     if (action === 'skill' && skillId) {
         const skill = SKILLS.find(s => s.id === skillId);
         player.mp -= skill.cost; UI.updateStatus(); 
-    }
-
-    if (Math.random() * 100 > hitChance) {
-        UI.addLog(`❌ 你的攻擊未命中！`, "log-battle"); 
-        UI.triggerShake(); 
-        return false;
     }
 
     let skill = null;
@@ -1013,38 +1085,63 @@ async function doPlayerMove(action, skillId) {
         skill = SKILLS.find(s => s.id === skillId);
     }
 
+    // 命中公式: 命中 / (命中 + 閃避 * 0.8)
+    const hitChance = player.hitRate / (player.hitRate + (enemy.dodge || 0) * 0.8);
+
     let hits = (skill && skill.hits) ? skill.hits : 1;
     
     for (let i = 0; i < hits; i++) {
         if (enemy.hp <= 0) break;
 
+        if (Math.random() > hitChance) {
+            UI.addLog(`❌ 你的攻擊被 ${enemy.name} 閃過了！`, "log-battle");
+            if (i < hits - 1) await wait(300);
+            continue; // 本次攻擊未命中，繼續下一次攻擊 (如果是多段攻擊)
+        }
+
+        // 傷害計算
         let isMagic = false;
         if (skill && skill.type === "magic") isMagic = true;
-        else if (player.job === "法師" && !skill) isMagic = true;
 
-        let baseDmg = isMagic ? player.magicAtk : player.atk;
+        
+       
+        let baseDmg = isMagic ? player.magicAtk : player.atk; // 面板攻擊
         let multiplier = skill ? skill.dmgScale : 1.0;
         let dmg = 0;
 
-        if (isMagic) dmg = baseDmg * multiplier; 
-        else dmg = Math.max(1, (baseDmg * multiplier) - enemy.def);
+        
+        if (isMagic) {
+            // 魔法傷害 = 面板魔攻 * 技能倍率 (無視防禦)
+            dmg = baseDmg * multiplier;
+        } else {
+            // 物理傷害 = 面板攻擊 * (1 - Def%)
+            const enemyDef = enemy.def || 0;
+            const defPercent = enemyDef / (enemyDef + 150 + (enemy.lvl || 1) * 5); // 百分比減傷
+            dmg = (baseDmg * multiplier) * (1 - defPercent);
+        }
 
+        // 暴擊判定
         let crit = false; 
         let critChance = player.critChance + (skill ? (skill.critBonus || 0) : 0);
         if (Math.random() * 100 < critChance) { 
-            dmg = Math.floor(dmg * 1.5); 
+            dmg *= (player.critDamage / 100); // 傷害 * (暴傷 / 100)
             crit = true; 
         }
-        dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
+
+        
+        // 傷害浮動 (0.9 ~ 1.1)
+        dmg *= (0.9 + Math.random() * 0.2);
+        dmg = Math.floor(dmg);
         if (dmg < 1) dmg = 1;
         
         enemy.hp -= dmg; 
         if (enemy.hp < 0) enemy.hp = 0;
 
-        let actionName = skill ? skill.name : "攻擊";
-        let msg = `🗡️ ${actionName} 命中！造成 ${dmg} 傷害。`;
-        if (crit) msg = `💥 暴擊！${actionName} 造成 ${dmg} 傷害！`;
         
+        let actionName = skill ? skill.name : "攻擊";
+        let msg = crit ? `💥 暴擊！${actionName} 造成 ${dmg} 傷害！` : `🗡️ ${actionName} 命中！造成 ${dmg} 傷害。`;
+        
+
         UI.addBattleLog(msg, crit ? "log-critical" : "log-battle"); 
         UI.triggerShake();
 
@@ -1064,19 +1161,44 @@ async function doPlayerMove(action, skillId) {
 async function doEnemyMove() {
     if (!gameState.inBattle || !player.alive || !gameState.enemy || gameState.enemy.hp <= 0) return false;
     const enemy = gameState.enemy;
+    
+    // 敵人行動後，扣除行動條
+    enemy.actionGauge -= 100; // 核心修正：行動後只扣除100，保留溢出值
+    gameState.lastActor = 'enemy'; // ✨ 記錄本次行動者為敵人
 
-    if (Math.random() * 100 < player.dodge) {
+    // 命中公式
+    const hitChance = (enemy.hitRate || 80) / ((enemy.hitRate || 80) + player.dodge * 0.8);
+
+    if (Math.random() > hitChance) {
         UI.addLog(`💨 你閃避了 ${enemy.name} 的攻擊！`, "log-battle");
     } else {
-        let dmg = Math.max(1, enemy.atk - player.def);
-        dmg = Math.floor(dmg * (0.8 + Math.random() * 0.4));
+        // 物理傷害 = 面板攻擊 * (1 - Def%)
+        const defPercent = player.def / (player.def + 150 + player.level * 5);
+        let dmg = (enemy.atk || 5) * (1 - defPercent);
+
+        // 暴擊判定
+        let crit = false;
+        if (Math.random() * 100 < (enemy.critChance || 5)) {
+            dmg *= ((enemy.critDamage || 150) / 100);
+            crit = true;
+        }
+
+        // 傷害浮動
+        dmg *= (0.9 + Math.random() * 0.2);
+        dmg = Math.floor(dmg);
+        if (dmg < 1) dmg = 1;
+
         player.hp -= dmg;
         let displayHp = Math.max(0, Math.floor(player.hp));
-        UI.addLog(`${enemy.name} 對你造成 ${dmg} 傷害。(${player.name} 剩 ${displayHp} HP)`, "log-battle");
+
+        let msg = crit ? `💥 ${enemy.name} 對你造成了致命一擊！損失 ${dmg} HP。` : `${enemy.name} 對你造成 ${dmg} 傷害。`;
+        UI.addLog(`${msg} (${player.name} 剩 ${displayHp} HP)`, "log-battle");
+
         UI.triggerShake();
     }
     UI.updateStatus();
 
+    // 檢查玩家是否死亡
     if (player.hp <= 0) {
         player.hp = 0;
         await wait(300);
@@ -1094,25 +1216,24 @@ export async function runAway() {
         return;
     }
 
-    gameState.isProcessingTurn = true;
+    // 在這裡不需要停止迴圈，因為沒有迴圈了
     UI.renderMainScreen();
 
     let escapeChance = 50 + (player.speed * 2); 
     if (Math.random() * 100 < escapeChance) {
         // ✨ 修正：逃跑成功後，應該回到探索模式，而不是直接回城
         gameState.inBattle = false; 
+        gameState.isPlayerTurn = false;
         gameState.mode = gameState.currentZone ? "explore" : "town"; // 如果有 zone 記錄，就回到 explore
         gameState.enemy = null; 
         UI.addLog("🏃‍♂️ 你成功脫離了戰鬥。", "log-battle");
-        gameState.isProcessingTurn = false; 
         UI.renderMainScreen(); 
         autoSave();
     } else {
         UI.addLog("🚫 逃跑失敗！被敵人抓住了！", "log-critical");
         await wait(600);
-        await doEnemyMove();
-        gameState.isProcessingTurn = false; 
-        UI.renderMainScreen();
+        // 逃跑失敗，輪到敵人行動
+        processNextTurn();
     }
 }
 
@@ -1121,27 +1242,29 @@ function winBattle() {
     if (!enemy || !gameState.inBattle) return;
 
     if (enemy.id === "boss_dragon") { gameClear(); return; }
-
+    
     // ✨ 修正：戰鬥勝利後，應該回到探索模式或城鎮模式
-    gameState.inBattle = false; 
-    gameState.mode = gameState.currentZone ? "explore" : "town"; gameState.enemy = null; gameState.isProcessingTurn = false;
+    gameState.inBattle = false; // 修正：移除多餘的 "Zone ? "explore" : "town";"
+    gameState.mode = gameState.currentZone ? "explore" : "town"; 
+    gameState.enemy = null; gameState.isProcessingTurn = false;
     UI.addLog(`🎉 擊敗了 ${enemy.name}！`, "log-battle");
     addExp(enemy.exp || 10); stats.kills++;
     const goldGain = 5 + Math.floor(Math.random() * 11) + (enemy.lvl * 2);
     player.gold += goldGain; UI.addLog(`獲得 ${goldGain} G`, "log-system");
     
+
     const baseDrop = enemy.dropRate || 0.1;
     const dropChance = baseDrop + (player.int * 0.01);
     if (Math.random() < dropChance) {
         if (Math.random() < 0.8) {
             const newItem = generateRandomEquipment(enemy.lvl); 
             inventory.push(newItem); 
-            UI.addLog(`🎁 掉落裝備：${newItem.name}`, "log-system");
         } else { lootRandomItem("treasure"); }
         UI.updateInventory();
     }
     UI.updateStatus(); UI.renderMainScreen(); autoSave();
-}
+} // 修正：移除多餘的 "ate.inBattle = false; gameState.mode = "town"; gameState.enemy = null; gameState.isProcessingTurn = false;"
+
 
 function gameClear() {
     gameState.inBattle = false; gameState.mode = "town"; gameState.enemy = null; gameState.isProcessingTurn = false;
@@ -1153,11 +1276,13 @@ function gameClear() {
 
 // ================== 核心修正：死亡處理函式 ==================
 function handlePlayerDeath(reason, forceTrueDeath = false) {
+    // 玩家死亡，戰鬥自然結束
     player.alive = false;
     player.hp = 0;
     UI.updateStatus();
 
     let killChance = 0.1;
+    // 修正：移除重複的 if 判斷
     if (gameState.enemy && gameState.enemy.killChance !== undefined) {
         killChance = gameState.enemy.killChance;
     }
@@ -1180,7 +1305,6 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         document.getElementById("jobPanel").style.display = "none";
         autoSave();
     } else {
-        const defeatSummary = document.getElementById("defeatSummary");
         let lostItems = [];
         if (inventory.length > 0) {
             inventory.forEach(i => lostItems.push(i.name));
@@ -1249,28 +1373,29 @@ export function chooseJob(jobKey) {
     if (jobKey === "warrior") { 
         player.job = "戰士"; 
         player.str = 5; 
-        player.con = 5; 
+        player.con = 4;
+        player.tec = 1;
         player.learnedSkills.push("s_bash"); 
         player.equippedSkills.push("s_bash"); 
     } else if (jobKey === "archer") { 
         player.job = "弓箭手"; 
-        player.agi = 6; 
+        player.agi = 5; 
         player.str = 2; 
-        player.int = 2; 
+        player.tec = 3;
         player.learnedSkills.push("s_double_shot"); 
         player.equippedSkills.push("s_double_shot"); 
     } else if (jobKey === "rogue") { 
         player.job = "盜賊"; 
         player.str = 3; 
-        player.agi = 5; 
-        player.int = 2; 
+        player.agi = 4; 
+        player.tec = 3;
         player.learnedSkills.push("s_backstab"); 
         player.equippedSkills.push("s_backstab"); 
     } else if (jobKey === "mage") { 
         player.job = "法師"; 
         player.int = 8; 
         player.con = 1; 
-        player.agi = 1; 
+        player.tec = 1;
         player.learnedSkills.push("s_fireball"); 
         player.equippedSkills.push("s_fireball"); 
     } 

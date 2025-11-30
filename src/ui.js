@@ -43,8 +43,9 @@ export function renderMainScreen() {
 
     if (gameState.mode === "battle") {
         const enemy = gameState.enemy || { name: "???", hp: 0, maxHp: 0, emoji: "❓" };
-        const globalLock = gameState.isProcessingTurn ? "disabled" : "";
-        
+        // ATB 系統下，按鈕鎖定由 isPlayerTurn 決定
+        const globalLock = !gameState.isPlayerTurn ? "disabled" : "";
+        // 移除 ATB 進度條的顯示
         topSection = `<div class="battle-box"><div class="battle-enemy-icon" style="font-size: 80px; margin: 5px 0; line-height: 1;">${enemy.emoji}</div><div class="battle-title">${enemy.name} ${enemy.lvl ? `(Lv.${enemy.lvl})` : ""}</div>${enemy.maxHp > 0 ? `<div class="battle-stats">HP：${enemy.hp}/${enemy.maxHp} | 攻：${enemy.atk}</div>` : ""}</div>`;
         
         let skillBtns = `<button onclick="handleCombat('attack')" style="border:1px solid #f1c40f;" ${globalLock}>⚔ 普攻</button>`;
@@ -52,7 +53,7 @@ export function renderMainScreen() {
             player.equippedSkills.forEach(skillId => {
                 const skillData = SKILLS.find(s => s.id === skillId);
                 if (skillData) {
-                    const disabled = (player.mp < skillData.cost || gameState.isProcessingTurn) ? "disabled" : "";
+                    const disabled = (player.mp < skillData.cost || !gameState.isPlayerTurn) ? "disabled" : "";
                     const costInfo = `${skillData.cost} ${skillData.costType === 'mp' ? 'MP' : '體'}`;
                     skillBtns += `<button onclick="handleCombat('skill', '${skillId}')" ${disabled}>${skillData.name}<br><small style="font-size:10px">(${costInfo})</small></button>`;
                 }
@@ -96,12 +97,13 @@ export function renderMainScreen() {
     } else if (gameState.mode === 'training') {
         // 3. 新增訓練場介面
         topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p></div>`;
-        let trainingButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">`;
-        const cost = 0; // 價格與 logic.js 同步
-        trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
-        trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
-        trainingButtons += `<button onclick="trainAttribute('con')">體質訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
-        trainingButtons += `<button onclick="trainAttribute('int')">智慧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
+        let trainingButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">`;
+        const cost = 0; // 根據要求，價格暫時為 0
+        trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 1. 力量
+        trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 2. 敏捷
+        trainingButtons += `<button onclick="trainAttribute('tec')">技巧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 3. 技巧
+        trainingButtons += `<button onclick="trainAttribute('con')">體質訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 4. 體質
+        trainingButtons += `<button onclick="trainAttribute('int')">智慧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 5. 智慧
         trainingButtons += `</div>`;
         actionButtons = `${trainingButtons}<div style="margin-top:10px; text-align:center;"><button onclick="closeTrainingGround()">離開訓練場</button></div>`;
     } else {
@@ -148,6 +150,7 @@ function getStatsString(stats) {
     if(stats.agi) arr.push(`敏+${stats.agi}`);
     if(stats.hp) arr.push(`血+${stats.hp}`);
     if(stats.mp) arr.push(`魔+${stats.mp}`);
+    if(stats.tec) arr.push(`技+${stats.tec}`); // 顯示 tec
     if(stats.magicAtk) arr.push(`魔攻+${stats.magicAtk}`);
     return arr.join(" ");
 }
@@ -166,8 +169,8 @@ function renderEquipmentPanel() {
     return html;
 }
 
-export function updateStatus() {
-    recalcDerivedStats(); 
+export function updateStatus(refill = false) {
+    recalcDerivedStats(refill); 
     // TopBar
     const topBar = document.getElementById("topBar");
     if (topBar) {
@@ -186,17 +189,20 @@ export function updateStatus() {
             ${createBar("HP", "❤️", player.hp, player.maxHP, "red-bar")}
             ${createBar("MP", "💧", player.mp, player.maxMP, "blue-bar")}
             ${createBar("飢餓", "🍗", player.hunger, player.hungerMax, "yellow-bar")}
+            <div style="border-top:1px solid #444; margin: 10px 0;"></div>
                 <div class="small-label">物理攻擊：${Math.floor(player.atk)}</div>
                 <div class="small-label">魔法攻擊：${Math.floor(player.magicAtk)}</div>
                 <div class="small-label">物理防禦：${Math.floor(player.def)}</div>
-                <div class="small-label">命中率：${player.hitRate.toFixed(1)}%</div>
-                <div class="small-label">閃避率：${player.dodge.toFixed(1)}%</div>
+                <div class="small-label">命中值：${player.hitRate.toFixed(1)}</div>
+                <div class="small-label">閃避值：${player.dodge.toFixed(1)}</div>
                 <div class="small-label">速度：${player.speed.toFixed(1)}</div>
+                <div class="small-label">暴擊率：${player.critChance.toFixed(1)}%</div>
+                <div class="small-label">暴擊傷害：${player.critDamage.toFixed(1)}%</div>
             </div>
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
-                <!-- 1. 移除屬性點與+號按鈕 -->
                 <div class="attr-line">STR 力量：${player.str}</div>
                 <div class="attr-line">AGI 敏捷：${player.agi}</div>
+                <div class="attr-line">TEC 技巧：${player.tec}</div>
                 <div class="attr-line">CON 體質：${player.con}</div>
                 <div class="attr-line">INT 智慧：${player.int}</div>
             </div>

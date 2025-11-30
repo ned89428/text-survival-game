@@ -3,13 +3,13 @@
 // 1. 玩家資料
 export let player = {
     name: "", job: "", day: 1, level: 1, exp: 0, expToLevel: 100, attrPoints: 0,
-    inventoryMaxSlots: 6, // 背包容量
-    str: 0, agi: 0, con: 0, int: 0,
+    inventoryMaxSlots: 8, // 背包容量
+    str: 0, agi: 0, con: 0, int: 0, tec: 0, // 新增 tec
     equipment: { head: null, body: null, weapon: null, accessory: null },
     learnedSkills: [], equippedSkills: [],
-    hp: 100, maxHP: 100, mp: 10, maxMP: 10,
+    hp: 100, maxHP: 100, mp: 20, maxMP: 20, actionGauge: 0, // 新增玩家行動條
     hunger: 100, hungerMax: 100,
-    atk: 5, magicAtk: 0, def: 0, dodge: 5, hitRate: 90, speed: 5, critChance: 5,
+    atk: 5, magicAtk: 0, def: 0, dodge: 0, hitRate: 80, speed: 10, critChance: 5, critDamage: 150,
     gold: 0, state: "正常", alive: true
 };
 
@@ -23,7 +23,10 @@ export let gameState = {
     inBattle: false,
     isProcessingTurn: false, // 戰鬥鎖定
     canAct: true,
-    cooldownTimerId: null,
+    cooldownTimerId: null, // 探索冷卻
+    battleLoopId: null,      // ATB 戰鬥迴圈 ID
+    isPlayerTurn: false,     // 標記是否輪到玩家行動
+    lastActor: null,         // ✨ 新增：追蹤上一個行動者 ('player' 或 'enemy')
     merchantActive: false, // 是否在商人介面
     canSafelyRetreat: false, // ✨ 新增：能否安全撤離
     merchantGoods: []
@@ -50,12 +53,13 @@ function applyStateBonuses() {
 }
 
 // 核心：數值計算公式
-export function recalcDerivedStats() { 
+export function recalcDerivedStats(refill = false) { 
     // === 1. 彙總基礎屬性與裝備加成 ===
     let totalStr = player.str;
     let totalAgi = player.agi;
     let totalCon = player.con;
     let totalInt = player.int;
+    let totalTec = player.tec;
     let bonusAtk = 0, bonusDef = 0, bonusMagic = 0, bonusHP = 0, bonusMP = 0;
 
     Object.values(player.equipment).forEach(item => {
@@ -64,6 +68,7 @@ export function recalcDerivedStats() {
             totalAgi += (item.stats.agi || 0);
             totalCon += (item.stats.con || 0);
             totalInt += (item.stats.int || 0);
+            totalTec += (item.stats.tec || 0); // 裝備 tec
             bonusAtk += (item.stats.atk || 0); bonusDef += (item.stats.def || 0);
             bonusMagic += (item.stats.magicAtk || 0); bonusHP += (item.stats.hp || 0);
             bonusMP += (item.stats.mp || 0);
@@ -71,45 +76,48 @@ export function recalcDerivedStats() {
     });
 
     // === 2. 定義職業的屬性成長係數 ===
-    let hpPerCon = 10, mpPerInt = 5, atkPerStr = 2, atkPerAgi = 0.5, magicAtkPerInt = 2, defPerCon = 0.5;
-    
-    if (player.job === "戰士") {
-        hpPerCon = 15; atkPerStr = 2.5; defPerCon = 1.0;
-    } else if (player.job === "弓箭手") {
-        atkPerStr = 0.8; atkPerAgi = 2.2;
-    } else if (player.job === "盜賊") {
-        atkPerStr = 1.2; atkPerAgi = 1.8;
-    } else if (player.job === "法師") {
-        hpPerCon = 8; mpPerInt = 8; magicAtkPerInt = 3.0;
-    }
+    // (根據新公式，職業影響已被移除，統一計算)
 
     // === 3. 計算二級屬性 (公式透明化) ===
-    // 生命 = 基礎50 + 等級加成 + (體質 * 每點體質給的血量) + 裝備額外血量
-    player.maxHP = 50 + (player.level * 5) + (totalCon * hpPerCon) + bonusHP;
-    // 魔力 = 基礎20 + 等級加成 + (智慧 * 每點智慧給的魔力) + 裝備額外魔力
-    player.maxMP = 20 + (player.level * 2) + (totalInt * mpPerInt) + bonusMP;
+    // 最大 HP: Base = 100 + (Lv * 10), MaxHP = Base * (1 + CON / 40) + 裝備HP
+    const baseHp = 100 + (player.level * 10);
+    player.maxHP = baseHp * (1 + totalCon / 40) + bonusHP;
+    // 最大 MP: Base = 20 + (Lv * 2), MaxMP = Base * (1 + INT / 30) + 裝備MP
+    const baseMp = 20 + (player.level * 2);
+    player.maxMP = baseMp * (1 + totalInt / 30) + bonusMP;
     // 飢餓 = 基礎100 + 體質微量加成
     player.hungerMax = 100 + totalCon * 5;
-    // 攻擊 = 基礎5 + (力量 * 係數) + (敏捷 * 係數) + 裝備額外攻擊
-    player.atk = 5 + (totalStr * atkPerStr) + (totalAgi * atkPerAgi) + bonusAtk;
-    // 魔攻 = 基礎0 + (智慧 * 係數) + 裝備額外魔攻
-    player.magicAtk = (totalInt * magicAtkPerInt) + bonusMagic;
-    // 防禦 = (體質 * 係數) + 裝備額外防禦
-    player.def = (totalCon * defPerCon) + bonusDef;
-    // 速度 = 基礎10 + 敏捷加成
-    player.speed = 10 + totalAgi * 1.2;
-    // 命中 = 基礎85 + 敏捷加成
-    player.hitRate = 85 + totalAgi * 0.5;
-    // 閃避 = 敏捷加成 (上限 60%)
-    player.dodge = Math.min(60, totalAgi * 0.8);
-    // 暴擊 = 基礎5% + 智慧/敏捷微量加成
-    player.critChance = 5 + (totalInt * 0.2) + (totalAgi * 0.1);
+    // 物理攻擊: Base = 5 + (STR * 1.5), ATK = Base * (1 + STR / 100) + 裝備ATK
+    const baseAtk = 5 + (totalStr * 1.5);
+    player.atk = baseAtk * (1 + totalStr / 100) + bonusAtk;
+    // 魔法攻擊: Base = INT * 2, MATK = Base * (1 + INT / 80) + 裝備MATK
+    const baseMagicAtk = totalInt * 2;
+    player.magicAtk = baseMagicAtk * (1 + totalInt / 80) + bonusMagic;
+    // 物理防禦 (RawDef): (CON * 1.0) + 裝備Def
+    player.def = (totalCon * 1.0) + bonusDef;
+    // 命中值: 80 + (Lv * 2) + (TEC * 2)
+    player.hitRate = 80 + (player.level * 2) + (totalTec * 2);
+    // 閃避值: (Lv * 1) + (AGI * 2)
+    player.dodge = (player.level * 1) + (totalAgi * 2);
+    // 速度: 10 + (AGI / (AGI + 100)) * 50
+    player.speed = 10 + (totalAgi / (totalAgi + 100)) * 50;
+    // 暴擊率: 5 + (TEC / (TEC + 200)) * 90
+    player.critChance = 5 + (totalTec / (totalTec + 200)) * 90;
+    // 暴擊傷害: 150 + (STR * 0.5)
+    player.critDamage = 150 + (totalStr * 0.5);
 
     // === 4. 處理特殊狀態加成 (例如：祝福、詛咒) ===
     applyStateBonuses();
     
     // === 5. 最後校正，確保目前值不超過最大值 ===
-    player.hp = Math.min(player.hp, player.maxHP); player.mp = Math.min(player.mp || 0, player.maxMP);
+    if (refill) {
+        // 如果需要補滿，直接設定為最大值
+        player.hp = player.maxHP;
+        player.mp = player.maxMP;
+    } else {
+        // 否則，只確保當前值不超過最大值
+        player.hp = Math.min(player.hp, player.maxHP); player.mp = Math.min(player.mp || 0, player.maxMP);
+    }
     player.hunger = Math.min(player.hunger, player.hungerMax);
 }
 
@@ -118,14 +126,15 @@ export function recalcDerivedStats() {
 // ==========================================
 export function resetGameData() {
     if (gameState.cooldownTimerId) { clearInterval(gameState.cooldownTimerId); gameState.cooldownTimerId = null; }
-    player.name = ""; player.job = ""; player.day = 1; player.level = 1; player.exp = 0; player.expToLevel = 100; player.attrPoints = 0;
-    player.str = 0; player.agi = 0; player.con = 0; player.int = 0;
+    player.name = ""; player.job = ""; player.day = 1; player.level = 1; player.exp = 0; player.expToLevel = 100;
+    player.str = 0; player.agi = 0; player.con = 0; player.int = 0; player.tec = 0;
     
     player.equipment = { head: null, body: null, weapon: null, accessory: null };
     player.learnedSkills = []; player.equippedSkills = [];
-    player.hp = 100; player.maxHP = 100; player.mp = 10; player.maxMP = 10;
+    player.actionGauge = 0; // 重置行動條
+    player.hp = 100; player.maxHP = 100; player.mp = 20; player.maxMP = 20;
     player.hunger = 100; player.hungerMax = 100;
-    player.atk = 5; player.magicAtk = 0; player.def = 0; player.dodge = 0; player.hitRate = 80; player.speed = 5; player.critChance = 5;
+    player.atk = 5; player.magicAtk = 0; player.def = 0; player.dodge = 0; player.hitRate = 80; player.speed = 10; player.critChance = 5; player.critDamage = 150;
     player.gold = 0; player.state = "正常"; player.alive = true;
 
     gameState.mode = "town"; // ✨ 重置為 town 模式
@@ -133,7 +142,7 @@ export function resetGameData() {
     gameState.depth = 0; // ✨ 重置深度
     gameState.logs = []; 
     gameState.enemy = null; 
-    gameState.canSafelyRetreat = false; // ✨ 重置安全撤離狀態
+    gameState.canSafelyRetreat = false; gameState.isPlayerTurn = false; gameState.lastActor = null;
     gameState.inBattle = false; 
     gameState.isProcessingTurn = false; gameState.canAct = true; gameState.merchantActive = false; gameState.merchantGoods = [];
     
