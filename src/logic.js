@@ -90,13 +90,6 @@ export function hardReset() {
 }
 
 // ================== 基礎與經驗 ==================
-export function addAttr(type) {
-    if (player.attrPoints <= 0) return;
-    if (type === "str") player.str++; if (type === "agi") player.agi++;
-    if (type === "con") player.con++; if (type === "int") player.int++;
-    player.attrPoints--; UI.updateStatus(); autoSave();
-}
-
 export function advanceDay() { 
     player.day++; 
     UI.updateStatus();
@@ -122,7 +115,8 @@ export function addExp(amount) {
     UI.updateStatus();
 }
 function levelUp() {
-    player.level++; player.attrPoints += 5; player.hp = player.maxHP; player.mp = player.maxMP;
+    // 1. 移除升級獲得屬性點
+    player.level++; player.hp = player.maxHP; player.mp = player.maxMP;
     UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
 
     // === 新增：升級時自動學習技能 ===
@@ -665,6 +659,38 @@ export function closeMerchant() {
     UI.addLog("結束交易"); 
     UI.updateInventory(); 
     UI.renderMainScreen();
+}
+
+// ================== 訓練場系統 (新增) ==================
+
+// 為了讓 UI 按鈕可以呼叫
+export function openTrainingGround() {
+    gameState.mode = "training";
+    UI.addLog("你來到了訓練場。");
+    UI.renderMainScreen();
+}
+
+export function closeTrainingGround() {
+    gameState.mode = "town";
+    UI.addLog("你離開了訓練場。");
+    UI.renderMainScreen();
+}
+
+export function trainAttribute(attribute) {
+    if (gameState.mode !== 'training') return;
+
+    const cost = 0; // 根據要求，價格暫時為 0
+
+    if (player.gold < cost) {
+        UI.addLog(`金錢不足，你需要 ${cost} G。`, "log-system");
+        return;
+    }
+
+    player.gold -= cost;
+    player[attribute]++; // 直接增加對應屬性
+    UI.addLog(`訓練成功！你的 ${attribute.toUpperCase()} 提升了。`, "log-system");
+    UI.updateStatus();
+    autoSave();
 }
 
 // ================== 探索與戰鬥系統 ==================

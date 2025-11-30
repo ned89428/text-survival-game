@@ -26,7 +26,6 @@ try {
     window.confirmName = Game.confirmName; // ✨ 確保 confirmName 被掛載
 
     // 2. 屬性與背包操作
-    window.addAttr = Game.addAttr;
     window.toggleInventory = UI.toggleInventory || Game.toggleInventory; // 相容檢查
     window.useItem = Game.useItem;
     window.sellOneItem = Game.sellOneItem;
@@ -55,6 +54,11 @@ try {
     window.openTownMerchant = Game.openTownMerchant;
     window.sellAllMaterials = Game.sellAllMaterials;
     window.closeMerchant = Game.closeMerchant;
+
+    // 6. 訓練場相關 (新增)
+    window.openTrainingGround = Game.openTrainingGround;
+    window.closeTrainingGround = Game.closeTrainingGround;
+    window.trainAttribute = Game.trainAttribute;
 
     console.log("所有函式掛載完成！檢查商人函式: ", window.closeMerchant);
 

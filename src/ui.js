@@ -93,6 +93,17 @@ export function renderMainScreen() {
             actionButtons = `<div style="margin-top:10px; text-align:center;"><button onclick="discardPendingLoot()" style="background:#c0392b;">丟棄新物品</button></div>`;
         }
         // 背包部分將由 updateInventory() 渲染，它會顯示「替換」按鈕
+    } else if (gameState.mode === 'training') {
+        // 3. 新增訓練場介面
+        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p></div>`;
+        let trainingButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">`;
+        const cost = 0; // 價格與 logic.js 同步
+        trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('con')">體質訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('int')">智慧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`;
+        trainingButtons += `</div>`;
+        actionButtons = `${trainingButtons}<div style="margin-top:10px; text-align:center;"><button onclick="closeTrainingGround()">離開訓練場</button></div>`;
     } else {
         // === 城鎮 / 探索模式 ===
         const isExploring = gameState.mode === 'explore'; // 判斷是否在探索中
@@ -183,11 +194,11 @@ export function updateStatus() {
                 <div class="small-label">速度：${player.speed.toFixed(1)}</div>
             </div>
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
-                <div class="small-label" style="color:#f1c40f;">剩餘點數：${player.attrPoints}</div>
-                <div class="attr-line">STR 力量：${player.str} ${player.attrPoints > 0 ? `<button onclick="addAttr('str')">+</button>` : ""}</div>
-                <div class="attr-line">AGI 敏捷：${player.agi} ${player.attrPoints > 0 ? `<button onclick="addAttr('agi')">+</button>` : ""}</div>
-                <div class="attr-line">CON 體質：${player.con} ${player.attrPoints > 0 ? `<button onclick="addAttr('con')">+</button>` : ""}</div>
-                <div class="attr-line">INT 智慧：${player.int} ${player.attrPoints > 0 ? `<button onclick="addAttr('int')">+</button>` : ""}</div>
+                <!-- 1. 移除屬性點與+號按鈕 -->
+                <div class="attr-line">STR 力量：${player.str}</div>
+                <div class="attr-line">AGI 敏捷：${player.agi}</div>
+                <div class="attr-line">CON 體質：${player.con}</div>
+                <div class="attr-line">INT 智慧：${player.int}</div>
             </div>
         `;
     }
@@ -285,12 +296,17 @@ export function updateStash() {
 export function showTownActions() {
     const act = document.getElementById("actions");
     if (act) {
-        // ✨ 更新：城鎮模式的按鈕
+        // 調整城鎮按鈕排版
         act.innerHTML = `
-            <button onclick="startExpedition('nearby')">🌲 前往附近 (蒐集)</button>
-            <button onclick="startExpedition('dungeon')">🕳️ 探索地下城 (挑戰)</button>
-            <button onclick="startExpedition('expedition')">🗺️ 踏上遠征 (危險)</button>
-            <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>`;
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 10px;">
+                <button onclick="startExpedition('nearby')">🌲 前往附近 (蒐集)</button>
+                <button onclick="startExpedition('dungeon')">🕳️ 探索地下城 (挑戰)</button>
+                <button onclick="startExpedition('expedition')">🗺️ 踏上遠征 (危險)</button>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>
+                <button onclick="openTrainingGround()" style="background:#8e44ad;">💪 前往訓練場</button>
+            </div>`;
         act.style.display = "block";
     }
 }
