@@ -116,7 +116,11 @@ export function addExp(amount) {
 }
 function levelUp() {
     // 1. 移除升級獲得屬性點
-    player.level++; player.hp = player.maxHP; player.mp = player.maxMP;
+    player.level++; 
+    player.hp = player.maxHP; 
+    player.mp = player.maxMP;
+    player.hungerMax += 10; // ✨ 升級增加飢餓值上限
+    player.hunger = player.hungerMax; // ✨ 升級補滿飢餓值
     UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
 
     // === 新增：升級時自動學習技能 ===
@@ -829,6 +833,11 @@ export function startExpedition(zoneId) {
 export function advanceExploration(explorationType = 'default') {
     if (gameState.mode !== 'explore' || !canDoExplore(5 + gameState.depth)) return; // 越深越餓
     
+    // ✨ 核心修正：一旦選擇繼續探索，就失去了之前找到的出口
+    if (gameState.currentZone !== 'nearby') {
+        gameState.canSafelyRetreat = false;
+    }
+
     gameState.depth++;
     stats.exploredNearby++; // 暫時先統一加到一個統計
     triggerEvent(explorationType);
@@ -1041,10 +1050,6 @@ async function processNextTurn() {
 export async function handleCombat(action, skillId = null) {
     // ATB 系統下，只有輪到玩家才能行動
     if (!gameState.inBattle || !player.alive || !gameState.isPlayerTurn) return;
-    if (action === 'run') { 
-        await runAway(); // runAway 也可能需要時間
-        return; 
-    }
 
     // 檢查 MP 是否足夠
     if (action === 'skill' && skillId) {
@@ -1059,6 +1064,7 @@ export async function handleCombat(action, skillId = null) {
 
     // 執行玩家動作，並等待其完成
     const enemyDied = await doPlayerMove(action, skillId);
+
     player.actionGauge -= 100; // 核心修正：行動後只扣除100，保留溢出值
     gameState.lastActor = 'player'; // ✨ 記錄本次行動者為玩家
 
@@ -1208,32 +1214,47 @@ async function doEnemyMove() {
     return false; 
 }
 
-export async function runAway() {
-    if (!gameState.inBattle || !player.alive || gameState.isProcessingTurn) return;
+export async function attemptToRun() {
+    // ✨ 核心修正：這是一個獨立於 handleCombat 的新函式
+    if (!gameState.inBattle || !player.alive || !gameState.isPlayerTurn) return;
     
     if (gameState.enemy && gameState.enemy.isBoss) {
         UI.addLog("🚫 這是 Boss 戰，無法逃跑！", "log-critical");
-        return;
+        return; // Boss 戰逃跑失敗，但不消耗回合
     }
 
-    // 在這裡不需要停止迴圈，因為沒有迴圈了
-    UI.renderMainScreen();
+    // 鎖定玩家回合，開始處理逃跑
+    gameState.isPlayerTurn = false;
+    gameState.isProcessingTurn = true;
 
+    // 判斷是否成功
     let escapeChance = 50 + (player.speed * 2); 
     if (Math.random() * 100 < escapeChance) {
-        // ✨ 修正：逃跑成功後，應該回到探索模式，而不是直接回城
+        // 逃跑成功
         gameState.inBattle = false; 
-        gameState.isPlayerTurn = false;
-        gameState.mode = gameState.currentZone ? "explore" : "town"; // 如果有 zone 記錄，就回到 explore
+        gameState.mode = gameState.currentZone ? "explore" : "town";
         gameState.enemy = null; 
         UI.addLog("🏃‍♂️ 你成功脫離了戰鬥。", "log-battle");
         UI.renderMainScreen(); 
         autoSave();
+        gameState.isProcessingTurn = false; // 解鎖
     } else {
+        // 逃跑失敗，立刻輪到敵人攻擊
         UI.addLog("🚫 逃跑失敗！被敵人抓住了！", "log-critical");
         await wait(600);
-        // 逃跑失敗，輪到敵人行動
-        processNextTurn();
+
+        // 消耗玩家行動值，並記錄行動者
+        player.actionGauge -= 100;
+        gameState.lastActor = 'player';
+
+        // 直接觸發敵人回合
+        const playerDied = await doEnemyMove();
+        gameState.isProcessingTurn = false; // 解鎖
+
+        // 如果玩家沒死，則在敵人行動後，重新計算下一回合
+        if (!playerDied) {
+            processNextTurn();
+        }
     }
 }
 

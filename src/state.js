@@ -81,12 +81,10 @@ export function recalcDerivedStats(refill = false) {
     // === 3. 計算二級屬性 (公式透明化) ===
     // 最大 HP: Base = 100 + (Lv * 10), MaxHP = Base * (1 + CON / 40) + 裝備HP
     const baseHp = 100 + (player.level * 10);
-    player.maxHP = baseHp * (1 + totalCon / 40) + bonusHP;
+    player.maxHP = Math.floor(baseHp * (1 + totalCon / 40) + bonusHP);
     // 最大 MP: Base = 20 + (Lv * 2), MaxMP = Base * (1 + INT / 30) + 裝備MP
     const baseMp = 20 + (player.level * 2);
     player.maxMP = baseMp * (1 + totalInt / 30) + bonusMP;
-    // 飢餓 = 基礎100 + 體質微量加成
-    player.hungerMax = 100 + totalCon * 5;
     // 物理攻擊: Base = 5 + (STR * 1.5), ATK = Base * (1 + STR / 100) + 裝備ATK
     const baseAtk = 5 + (totalStr * 1.5);
     player.atk = baseAtk * (1 + totalStr / 100) + bonusAtk;

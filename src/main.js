@@ -47,7 +47,7 @@ try {
 
     // 4. 戰鬥相關
     window.handleCombat = Game.handleCombat;
-    window.runAway = Game.runAway;
+    window.attemptToRun = Game.attemptToRun; // ✨ 掛載新的逃跑函式
 
     // 5. 商人相關 (請特別注意這裡)
     window.buyItem = Game.buyItem;

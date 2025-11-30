@@ -59,7 +59,7 @@ export function renderMainScreen() {
                 }
             });
         }
-        actionButtons = `<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">${skillBtns}</div><div style="margin-top:5px;"><button onclick="handleCombat('run')" style="width:100%; background:#555;" ${globalLock}>🏃‍♂️ 逃跑</button></div>`;
+        actionButtons = `<div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">${skillBtns}</div><div style="margin-top:5px;"><button onclick="attemptToRun()" style="width:100%; background:#555;" ${globalLock}>🏃‍♂️ 逃跑</button></div>`;
         
         // 戰鬥中隱藏倉庫
         const stashBox = document.getElementById("stashBox");
