@@ -37,6 +37,8 @@ try {
     window.takeFromStash = Game.takeFromStash;
     window.depositGold = Game.depositGold;
     window.withdrawGold = Game.withdrawGold;
+    window.swapWithLoot = Game.swapWithLoot; // ✨ 掛載替換函式
+    window.discardPendingLoot = Game.discardPendingLoot; // ✨ 掛載丟棄函式
 
     // 3. 探索行動
     window.startExpedition = Game.startExpedition;

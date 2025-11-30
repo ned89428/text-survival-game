@@ -304,7 +304,7 @@ function getWeightedRandomItem(items) {
     if (validItems.length === 0) return null;
 
     const totalWeight = validItems.reduce((sum, item) => sum + (item.chance || 0), 0);
-    if (totalWeight <= 0) return validItems[Math.floor(Math.random() * validItems.length)]; // 如果權重都是0，就隨機選一個
+    if (totalWeight <= 0) return validItems[Math.floor(Math.random() * validItems.length)];
 
     let random = Math.random() * totalWeight;
     for (const item of validItems) {
@@ -313,43 +313,114 @@ function getWeightedRandomItem(items) {
             return item;
         }
     }
-    return validItems[validItems.length - 1]; // 備用，防止浮點數誤差
+    return validItems[validItems.length - 1];
 }
 
 function lootRandomItem(type) {
-    if (type === "food") { 
+    let newItem = null;
+
+    if (type === "food") {
         const foodItems = CONSUMABLES.filter(c => c.id.includes("food_"));
         const chosenItem = getWeightedRandomItem(foodItems);
-        if (chosenItem) {
-            const item = { ...chosenItem };
-            item.sellPrice = Math.floor(item.price / 2);
-            addToInventory(item);
-            UI.addLog(`🍱 你找到 ${item.name}，已放入背包。`, "log-system");
-        }
+        if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
     } else if (type === "treasure") {
-        if (Math.random() < 0.6) { // 60% 機率獲得消耗品
+        if (Math.random() < 0.6) {
             const chosenItem = getWeightedRandomItem(CONSUMABLES);
-            if (chosenItem) {
-                const item = { ...chosenItem };
-                item.sellPrice = Math.floor(item.price / 2);
-                addToInventory(item);
-                UI.addLog(`✨ 你找到 ${item.name}！`, "log-system");
-            }
-        } else { // 40% 機率獲得素材
-            const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 10, stackable: true };
-            addToInventory(mat);
-            UI.addLog("🧩 你撿到一些普通素材。", "log-system");
+            if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
+        } else {
+            newItem = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 10, stackable: true };
         }
     } else if (type === "material") {
-        const mat = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true };
-        addToInventory(mat);
-        UI.addLog("🧩 你撿到一些普通素材。", "log-system");
+        newItem = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true };
     }
-    UI.updateInventory();
+    
+    if (!newItem) return;
+
+    // ✨ 核心改造：檢查背包空間
+    if (canBeAddedToInventory(newItem)) {
+        addToInventory(newItem);
+        UI.addLog(`🎁 你找到了 ${newItem.name}，已放入背包。`, "log-system");
+        UI.updateInventory();
+    } else {
+        // 背包已滿，進入替換模式
+        gameState.pendingLoot = newItem;
+        gameState.mode = 'loot-swap';
+        UI.addLog(`🎒 背包已滿！你發現了 ${newItem.name}，要替換嗎？`, "log-system");
+        UI.renderMainScreen();
+    }
     autoSave();
 }
-export function equipItem(index) { const item = inventory[index]; if (!item || item.type !== "equip") return; const slot = item.slot; const currentEquip = player.equipment[slot]; if (currentEquip) addToInventory(currentEquip); player.equipment[slot] = item; inventory.splice(index, 1); UI.addLog(`你裝備了 ${item.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
-export function unequipItem(slot) { const item = player.equipment[slot]; if (!item) return; player.equipment[slot] = null; addToInventory(item); UI.addLog(`你卸下了 ${item.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
+
+// ✨ 新增：處理拾取替換的函式
+export function swapWithLoot(inventoryIndex) {
+    if (gameState.mode !== 'loot-swap' || !gameState.pendingLoot) return;
+
+    const newItem = gameState.pendingLoot;
+    const oldItem = inventory[inventoryIndex];
+
+    inventory[inventoryIndex] = newItem; // 替換
+
+    UI.addLog(`你丟棄了 ${oldItem.name}，換成了 ${newItem.name}。`, "log-system");
+
+    // 清理狀態
+    gameState.pendingLoot = null;
+    gameState.mode = gameState.currentZone ? 'explore' : 'town'; // 回到之前的模式
+    UI.renderMainScreen();
+    autoSave();
+}
+
+// ✨ 新增：處理放棄拾取的函式
+export function discardPendingLoot() {
+    if (gameState.mode !== 'loot-swap' || !gameState.pendingLoot) return;
+
+    const discardedItem = gameState.pendingLoot;
+    UI.addLog(`你決定將 ${discardedItem.name} 留在原地。`, "log-system");
+
+    // 清理狀態
+    gameState.pendingLoot = null;
+    gameState.mode = gameState.currentZone ? 'explore' : 'town';
+    UI.renderMainScreen();
+    autoSave();
+}
+
+export function equipItem(index) {
+    const itemToEquip = inventory[index];
+    if (!itemToEquip || itemToEquip.type !== "equip") return;
+
+    const slot = itemToEquip.slot;
+    const currentlyEquippedItem = player.equipment[slot];
+
+    // 核心修正：執行交換邏輯
+    // 1. 將新裝備穿到身上
+    player.equipment[slot] = itemToEquip;
+
+    // 2. 如果原本該部位有裝備，則將舊裝備放回新裝備原來在背包的位置
+    if (currentlyEquippedItem) {
+        inventory[index] = currentlyEquippedItem;
+    } else {
+        // 3. 如果原本該部位是空的，才從背包中移除新裝備
+        inventory.splice(index, 1);
+    }
+
+    UI.addLog(`你裝備了 ${itemToEquip.name}。`); UI.updateStatus(); UI.updateInventory(); autoSave(); }
+export function unequipItem(slot) { 
+    const item = player.equipment[slot]; 
+    if (!item) return;
+
+    // ✨ 核心修正：檢查背包空間
+    if (!canBeAddedToInventory(item)) {
+        UI.addLog("🎒 背包已滿，無法卸下裝備。", "log-system");
+        return;
+    }
+
+    player.equipment[slot] = null; 
+    addToInventory(item); 
+    UI.addLog(`你卸下了 ${item.name}。`); 
+    UI.updateStatus(); 
+    UI.updateInventory(); 
+    autoSave(); 
+}
+
 export function useItem(i) { 
     const item = inventory[i]; 
     if (!item || !item.usable) return;
@@ -526,14 +597,51 @@ export function openTownMerchant() {
     openMerchant('TOWN');
 }
 
+// ✨ 新增：檢查物品是否能加入背包的輔助函式
+function canBeAddedToInventory(item) {
+    // 檢查是否有空格
+    if (inventory.length < player.inventoryMaxSlots) {
+        return true;
+    }
+    // 如果背包已滿，只檢查可堆疊物品是否還有空間
+    if (item.stackable) {
+        const itemDef = CONSUMABLES.find(c => c.id === item.id) || (item.id === 'mat_common' ? { maxStack: 20 } : null);
+        const maxStack = itemDef ? itemDef.maxStack : 1;
+        
+        // 尋找現有的、未滿的堆疊
+        for (const existingItem of inventory) {
+            if (existingItem.id === item.id && existingItem.count < maxStack) {
+                return true;
+            }
+        }
+    }
+    // 非堆疊物品或沒有可堆疊空間
+    return false;
+}
+
 export function buyItem(index) {
     const item = gameState.merchantGoods[index];
     if (!item || typeof item.price !== 'number') return;
-    if (player.gold < item.price) { UI.addLog(`金錢不足，你需要 ${item.price} G`, "log-system"); return; }
+    
+    // ✨ 核心修正：購買前先檢查背包空間
+    if (!canBeAddedToInventory(item)) {
+        UI.addLog("🎒 背包已滿！無法購買此物品。", "log-system");
+        renderMerchantUI(); // 刷新商人介面以顯示訊息
+        return;
+    }
+
+    if (player.gold < item.price) { 
+        UI.addLog(`金錢不足，你需要 ${item.price} G`, "log-system"); 
+        return; 
+    }
+
     player.gold -= item.price; 
     addToInventory({ ...item });
-    UI.updateStatus(); UI.updateInventory(); UI.addLog(`購買了 ${item.name}`, "log-system");
-    renderMerchantUI(`感謝購買！已獲得 ${item.name}。`); autoSave();
+    UI.updateStatus(); 
+    UI.updateInventory(); 
+    UI.addLog(`購買了 ${item.name}`, "log-system");
+    renderMerchantUI(`感謝購買！已獲得 ${item.name}。`); 
+    autoSave();
 }
 
 export function sellAllMaterials() {

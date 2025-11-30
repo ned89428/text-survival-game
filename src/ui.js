@@ -75,6 +75,24 @@ export function renderMainScreen() {
         actionButtons = `${goodsHtml}<div style="margin-top:10px; text-align:center;"><button onclick="sellAllMaterials()">出售所有素材</button><button onclick="closeMerchant()">離開商人</button></div>`;
         
         // 商人模式隱藏倉庫
+    } else if (gameState.mode === 'loot-swap') {
+        const newItem = gameState.pendingLoot;
+        if (newItem) {
+            const statsDesc = newItem.type === "equip" ? `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(newItem.stats)}</div>` : (newItem.desc ? `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${newItem.desc}</div>` : "");
+            topSection = `
+                <div style="text-align:center; margin-bottom:10px;">
+                    <div style="font-size: 24px; color: #f1c40f;">🎒 背包已滿！</div>
+                    <p>你發現了新物品，要替換掉一個舊的嗎？</p>
+                    <div class="inv-item" style="background: #222; justify-content: center;">
+                       <div style="text-align:left;">
+                           <div>${newItem.emoji} ${newItem.name}</div>
+                           ${statsDesc}
+                       </div>
+                    </div>
+                </div>`;
+            actionButtons = `<div style="margin-top:10px; text-align:center;"><button onclick="discardPendingLoot()" style="background:#c0392b;">丟棄新物品</button></div>`;
+        }
+        // 背包部分將由 updateInventory() 渲染，它會顯示「替換」按鈕
     } else {
         // === 城鎮 / 探索模式 ===
         const isExploring = gameState.mode === 'explore'; // 判斷是否在探索中
@@ -190,19 +208,25 @@ export function updateInventory() {
     if (inventory.length === 0) {
         itemsDiv.innerHTML = `<div style="opacity:0.7; padding:10px;">（背包是空的）</div>`;
     } else {
-        inventory.forEach((item, i) => { // ✨ 修正：在商人介面顯示「賣出」按鈕
-            let actionBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
-            
-            // ✨ 修正：只要有 price 或 sellPrice 就能顯示賣出按鈕
-            const sellValue = item.sellPrice || Math.floor(item.price / 2);
-            let sellBtn = (gameState.merchantActive && sellValue > 0) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${sellValue}G)</button>` : "";
+        inventory.forEach((item, i) => {
+            let actionButtonsHtml = '';
 
-            // ✨ 存入按鈕：只有在正常模式顯示
-            let storeBtn = (gameState.mode === 'town' && !gameState.merchantActive && !gameState.inBattle) 
-                ? `<button onclick="moveToStash(${i})" style="color:#f39c12; border-color:#f39c12;">存入</button>` 
-                : "";
-            
-            let dropBtn = `<button onclick="dropItem(${i})">丟棄 1個</button>`;
+            // ✨ 核心改造：根據遊戲模式決定按鈕
+            if (gameState.mode === 'loot-swap') {
+                actionButtonsHtml = `<button onclick="swapWithLoot(${i})" style="background:#27ae60">替換</button>`;
+            } else {
+                let useBtn = item.type === "equip" ? `<button onclick="equipItem(${i})">裝備</button>` : (item.usable ? `<button onclick="useItem(${i})">使用</button>` : "");
+                
+                const sellValue = item.sellPrice || Math.floor((item.price || 0) / 2);
+                let sellBtn = (gameState.merchantActive && sellValue > 0) ? `<button onclick="sellOneItem(${i})">賣出 1個 (${sellValue}G)</button>` : "";
+
+                let storeBtn = (gameState.mode === 'town' || gameState.isTownMerchant) && !gameState.inBattle 
+                    ? `<button onclick="moveToStash(${i})" style="color:#f39c12; border-color:#f39c12;">存入</button>` 
+                    : "";
+                
+                let dropBtn = `<button onclick="dropItem(${i})">丟棄 1個</button>`;
+                actionButtonsHtml = `${useBtn}${sellBtn}${storeBtn}${dropBtn}`;
+            }
 
             let statsDesc = "";
             if (item.type === "equip") statsDesc = `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(item.stats)}</div>`;
@@ -213,7 +237,7 @@ export function updateInventory() {
             itemsDiv.innerHTML += `
                 <div class="inv-item">
                     <div style="flex:1"><div>${item.emoji} ${item.name} ${countDisplay}</div>${statsDesc}</div>
-                    <div style="display:flex; align-items:center;">${actionBtn}${sellBtn}${storeBtn}${dropBtn}</div>
+                    <div style="display:flex; align-items:center;">${actionButtonsHtml}</div>
                 </div>
             `;
         });
