@@ -4,7 +4,7 @@ import * as Game from './logic.js';
 console.log("正在載入 Main.js...");
 
 // ✨ 更新：設定遊戲標題
-const newTitle = "薪水小偷的冒險日誌";
+const newTitle = "Take It Alive";
 document.title = newTitle; // 設定瀏覽器分頁標題
 const titleElement = document.getElementById("title");
 if (titleElement) titleElement.innerText = newTitle; // 設定頁面內可見標題
