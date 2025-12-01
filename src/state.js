@@ -5,7 +5,7 @@ export let player = {
     name: "", job: "", day: 1, level: 1, exp: 0, expToLevel: 100, attrPoints: 0,
     inventoryMaxSlots: 8, // 背包容量
     str: 0, agi: 0, con: 0, int: 0, tec: 0, // 新增 tec
-    equipment: { head: null, body: null, weapon: null, accessory: null },
+    equipment: { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null },
     learnedSkills: [], equippedSkills: [],
     hp: 100, maxHP: 100, mp: 20, maxMP: 20, actionGauge: 0, // 新增玩家行動條
     hunger: 100, hungerMax: 100,
@@ -61,7 +61,7 @@ export function recalcDerivedStats(refill = false) {
     let totalCon = player.con;
     let totalInt = player.int;
     let totalTec = player.tec;
-    let bonusAtk = 0, bonusDef = 0, bonusMagic = 0, bonusHP = 0, bonusMP = 0;
+    let bonusAtk = 0, bonusDef = 0, bonusMagic = 0, bonusHP = 0, bonusMP = 0, bonusSlots = 0;
 
     Object.values(player.equipment).forEach(item => {
         if (item) {
@@ -73,8 +73,13 @@ export function recalcDerivedStats(refill = false) {
             bonusAtk += (item.stats.atk || 0); bonusDef += (item.stats.def || 0);
             bonusMagic += (item.stats.magicAtk || 0); bonusHP += (item.stats.hp || 0);
             bonusMP += (item.stats.mp || 0);
+            bonusSlots += (item.stats.slots || 0); // ✨ 核心：累加裝備提供的欄位
         }
     });
+
+    // === 1.5. 計算背包容量 ===
+    const baseSlots = 8; // 玩家的基礎背包容量
+    player.inventoryMaxSlots = baseSlots + bonusSlots;
 
     // === 2. 定義職業的屬性成長係數 ===
     // (根據新公式，職業影響已被移除，統一計算)
@@ -128,7 +133,7 @@ export function resetGameData() {
     player.name = ""; player.job = ""; player.day = 1; player.level = 1; player.exp = 0; player.expToLevel = 100;
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0; player.tec = 0;
     
-    player.equipment = { head: null, body: null, weapon: null, accessory: null };
+    player.equipment = { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null };
     player.learnedSkills = []; player.equippedSkills = [];
     player.actionGauge = 0; // 重置行動條
     player.hp = 100; player.maxHP = 100; player.mp = 20; player.maxMP = 20;

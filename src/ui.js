@@ -131,6 +131,17 @@ export function renderMainScreen() {
     // 3. 渲染背包與倉庫
     updateInventory(); 
     updateStash();
+
+    // ✨ 核心改造：動態同步左右兩側欄位的高度
+    // 使用 requestAnimationFrame 確保在瀏覽器完成繪製後再計算高度
+    requestAnimationFrame(() => {
+        const eventBox = document.getElementById('eventBox');
+        const statusBox = document.getElementById('statusBox');
+        const inventoryBox = document.getElementById('inventoryBox');
+        if (eventBox && statusBox && inventoryBox) {
+            inventoryBox.style.height = `${eventBox.offsetHeight}px`;
+        }
+    });
 }
 
 export function triggerShake() {
@@ -152,12 +163,20 @@ function getStatsString(stats) {
     if(stats.mp) arr.push(`魔+${stats.mp}`);
     if(stats.tec) arr.push(`技+${stats.tec}`); // 顯示 tec
     if(stats.magicAtk) arr.push(`魔攻+${stats.magicAtk}`);
+    if(stats.slots) arr.push(`背包+${stats.slots}`); // ✨ 核心：顯示背包欄位加成
     return arr.join(" ");
 }
 
 function renderEquipmentPanel() {
-    const slots = { head: "頭盔 🪖", body: "衣服 🧥", weapon: "武器 ⚔️", accessory: "寶物 💍" };
-    let html = `<div class="equip-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #444;">`;
+    // ✨ 核心改造：調整裝備欄位順序以符合新的排版要求
+    const slots = { 
+        head: "頭盔 👑", 
+        body: "衣服 🧥", 
+        shoes: "鞋子 👢", 
+        weapon: "武器 ⚔️", 
+        backpack: "背包 🎒", 
+        accessory: "寶物 💍" };
+    let html = `<div class="equip-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #444;">`;
     for (const [key, label] of Object.entries(slots)) {
         const item = player.equipment[key];
         const content = item 
@@ -250,15 +269,19 @@ export function updateInventory() {
             }
 
             let statsDesc = "";
-            if (item.type === "equip") statsDesc = `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(item.stats)}</div>`;
-            else if (item.desc) statsDesc = `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${item.desc}</div>`;
+            // ✨ 核心改造：將描述文字改為 span，並加上一些間距
+            if (item.type === "equip") statsDesc = `<span style="font-size:12px; color:#a29bfe; margin-left: 8px;">${getStatsString(item.stats)}</span>`;
+            else if (item.desc) statsDesc = `<span style="font-size:12px; color:#b2bec3; margin-left: 8px;">${item.desc}</span>`;
 
             let countDisplay = (item.count && item.count > 1) ? `<span style="font-weight:bold; color:#fff; margin-left:5px;">x${item.count}</span>` : "";
 
+            // ✨ 核心改造：強制讓物品資訊和按鈕分為上下兩行
             itemsDiv.innerHTML += `
-                <div class="inv-item">
-                    <div style="flex:1"><div>${item.emoji} ${item.name} ${countDisplay}</div>${statsDesc}</div>
-                    <div style="display:flex; align-items:center;">${actionButtonsHtml}</div>
+                <div class="inv-item" style="flex-direction: column; align-items: flex-start;">
+                    <div class="inv-item-info" style="margin-bottom: 8px;">
+                        <span>${item.emoji} ${item.name} ${countDisplay}</span>${statsDesc}
+                    </div>
+                    <div class="inv-item-actions">${actionButtonsHtml}</div>
                 </div>
             `;
         });

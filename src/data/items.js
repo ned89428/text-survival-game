@@ -25,7 +25,15 @@ export const EQUIP_TEMPLATES = [
     // === 飾品 (Accessory) ===
     { id: "a_ring", name: "銅戒指", type: "accessory", emoji: "💍", str: 1, minLvl: 1, usable: true, basePrice: 80 },
     { id: "a_amulet", name: "護身符", type: "accessory", emoji: "🧿", con: 2, minLvl: 2, usable: true, basePrice: 150 },
-    { id: "a_gem", name: "魔力寶石", type: "accessory", emoji: "💎", int: 3, minLvl: 4, usable: true, basePrice: 400 }
+    { id: "a_gem", name: "魔力寶石", type: "accessory", emoji: "💎", int: 3, minLvl: 4, usable: true, basePrice: 400 },
+
+    // === ✨ 新增：鞋子 (Shoes) ===
+    { id: "s_boots", name: "皮靴", type: "shoes", emoji: "👢", baseDef: 1, agi: 1, minLvl: 1, usable: true, basePrice: 70 },
+    { id: "s_greaves", name: "鐵製脛甲", type: "shoes", emoji: "🥾", baseDef: 2, con: 1, minLvl: 4, usable: true, basePrice: 320 },
+
+    // === ✨ 新增：背包 (Backpack) ===
+    { id: "p_small_pouch", name: "小皮袋", type: "backpack", emoji: "👝", slots: 1, minLvl: 1, usable: true, basePrice: 100 },
+    { id: "p_hiking_pack", name: "登山包", type: "backpack", emoji: "🎒", hp: 30, con: 1, slots: 2, minLvl: 5, usable: true, basePrice: 450 }
 ];
 
 // 2. 品質前綴 (Prefixes)

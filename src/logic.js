@@ -298,7 +298,7 @@ export function withdrawGold() {
     autoSave();
 }
 
-function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); const buyPrice = Math.max(1, Math.floor((template.basePrice || 50) * quality.mod)); const sellPrice = Math.floor(buyPrice / 2); return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: true, stackable: false }; }
+function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); if(template.slots) stats.slots = template.slots; const buyPrice = Math.max(1, Math.floor((template.basePrice || 50) * quality.mod)); const sellPrice = Math.floor(buyPrice / 2); return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: true, stackable: false }; }
 
 // ✨ 新增：通用的權重隨機物品選擇器
 function getWeightedRandomItem(items) {
@@ -389,6 +389,21 @@ export function equipItem(index) {
     const itemToEquip = inventory[index];
     if (!itemToEquip || itemToEquip.type !== "equip") return;
 
+    // ✨ 核心修正：在裝備前預先檢查背包空間是否會溢出
+    if (itemToEquip.slot) {
+        const currentlyEquipped = player.equipment[itemToEquip.slot];
+        if (currentlyEquipped) { // 只有在替換裝備時才需要檢查
+            const currentSlotsBonus = currentlyEquipped.stats.slots || 0;
+            const newSlotsBonus = itemToEquip.stats.slots || 0;
+            const futureMaxSlots = player.inventoryMaxSlots - currentSlotsBonus + newSlotsBonus;
+            // 因為是交換，物品總數不變，所以直接用 inventory.length 判斷
+            if (inventory.length > futureMaxSlots) {
+                UI.addLog("🎒 更換後背包空間不足，無法裝備！", "log-system");
+                return;
+            }
+        }
+    }
+
     const slot = itemToEquip.slot;
     const currentlyEquippedItem = player.equipment[slot];
 
@@ -409,9 +424,13 @@ export function unequipItem(slot) {
     const item = player.equipment[slot]; 
     if (!item) return;
 
-    // ✨ 核心修正：檢查背包空間
-    if (!canBeAddedToInventory(item)) {
-        UI.addLog("🎒 背包已滿，無法卸下裝備。", "log-system");
+    // ✨ 核心修正：檢查卸下後背包是否會溢出
+    const itemSlots = item.stats.slots || 0;
+    // 預測卸下後的狀態：目前物品數量 + 1 (卸下的裝備) vs. 未來最大欄位 (目前最大欄位 - 裝備提供欄位)
+    const futureItemCount = inventory.length + 1;
+    const futureMaxSlots = player.inventoryMaxSlots - itemSlots;
+    if (futureItemCount > futureMaxSlots) {
+        UI.addLog("🎒 背包空間不足，無法卸下此裝備！", "log-system");
         return;
     }
 
@@ -500,6 +519,7 @@ function createEquipFromTemplate(template, price) {
     if (template.con) stats.con = template.con;
     if (template.hp) stats.hp = template.hp;
     if (template.mp) stats.mp = template.mp;
+    if (template.slots) stats.slots = template.slots; // ✨ 確保商人販售的背包也有欄位加成
 
     return {
         name: template.name,
@@ -719,7 +739,7 @@ function startCooldown(seconds) {
 }
 
 function canDoExplore(costHunger) {
-    if (!player.alive || !gameState.canAct || gameState.inBattle || gameState.merchantActive) return false;
+    if (!player.alive || !gameState.canAct || gameState.inBattle || gameState.merchantActive) return false;    
     
     let failed = false;
     if (player.hunger <= 0) { player.hp -= 15; UI.addLog("⚠️ 肚子餓扁了還強行探索... HP -15", "log-critical"); failed = true; } else { player.hunger = Math.max(0, player.hunger - costHunger); }
@@ -836,7 +856,11 @@ export function startExpedition(zoneId) {
 }
 
 export function advanceExploration(explorationType = 'default') {
-    if (gameState.mode !== 'explore' || !canDoExplore(5 + gameState.depth)) return; // 越深越餓
+    // ✨ 核心改造：使用新的「對數增長」混合公式，並設定 8 點為消耗極值
+    const baseCost = 2; // 基礎消耗
+    const depthBonus = Math.floor(Math.log2(Math.max(1, gameState.depth))); // 深度加成
+    const finalCost = Math.min(10, baseCost + depthBonus); // ✨ 核心改造：消耗上限改為 10
+    if (gameState.mode !== 'explore' || !canDoExplore(finalCost)) return; // 檢查並扣除飢餓
     
     // ✨ 核心修正：一旦選擇繼續探索，就失去了之前找到的出口
     if (gameState.currentZone !== 'nearby') {
@@ -885,20 +909,6 @@ export function retreatToTown() {
         gainExp(finalExp);
     }
 
-    gameState.mode = "town";
-    gameState.currentZone = null;
-    gameState.canSafelyRetreat = false;
-    gameState.depth = 0;
-    gameState.pendingExp = 0; // 結算完畢，歸零
-
-    // ✨ 新增：回到城鎮時，完全恢復 HP 和 MP
-    player.hp = player.maxHP;
-    player.mp = player.maxMP;
-
-    UI.addLog("你安全地回到了城鎮。HP與MP已完全恢復。", "log-system");
-    UI.updateStatus(); // 更新狀態以顯示恢復後的血魔
-    UI.renderMainScreen();
-    autoSave();
     returnToTownCleanup(); // ✨ 呼叫新的清理函式
 }
 
@@ -985,7 +995,6 @@ export function forceRetreat() {
         // (如果在這裡免除懲罰，需要把上面扣錢扣物的邏輯包在 else 裡)
     }
 
-    retreatToTown(); // 最後呼叫安全回城函式來重置狀態
     returnToTownCleanup(); // ✨ 核心修正：最後呼叫新的清理函式來重置狀態
 }
 
@@ -1325,8 +1334,14 @@ export async function attemptToRun() {
     gameState.isProcessingTurn = true;
 
     // 判斷是否成功
-    let escapeChance = 50 + (player.speed * 2); 
-    if (Math.random() * 100 < escapeChance) {
+    // ✨ 核心改造：逃跑成功率現在取決於玩家與敵人的「速度差」
+    const enemySpeed = gameState.enemy.speed || 10; // 確保敵人有基礎速度
+    const speedDifference = player.speed - enemySpeed;
+    let escapeChance = 50 + (speedDifference * 1.5); // 每點速度差影響 1.5% 成功率
+
+    // 確保成功率被限制在 10% 到 95% 之間，避免絕對成功或失敗
+    const finalChance = Math.max(10, Math.min(escapeChance, 95));
+    if (Math.random() * 100 < finalChance) {
         // 逃跑成功
         gameState.inBattle = false; 
         gameState.mode = gameState.currentZone ? "explore" : "town";
@@ -1405,10 +1420,19 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
     player.hp = 0;
     UI.updateStatus();
 
-    let killChance = 0.1;
-    // 修正：移除重複的 if 判斷
+    // ✨ 核心改造：根據死亡原因決定致死率
+    let killChance = 0; // 預設為 0
+    const isCombatDeath = (gameState.enemy !== null);
+
     if (gameState.enemy && gameState.enemy.killChance !== undefined) {
+        // 如果是戰鬥死亡，且敵人有指定致死率 (例如 Boss)，則使用該值
         killChance = gameState.enemy.killChance;
+    } else if (isCombatDeath) {
+        // 如果是普通戰鬥死亡，致死率為 1% ~ 3%
+        killChance = 0.01 + Math.random() * 0.02;
+    } else {
+        // 如果是飢餓、中毒等非戰鬥死亡，致死率為 0 (必定重傷撤退)
+        killChance = 0;
     }
 
     let isTrueDeath = forceTrueDeath || (Math.random() < killChance);
@@ -1429,18 +1453,32 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         document.getElementById("jobPanel").style.display = "none";
         autoSave();
     } else {
-        let lostItems = [];
+        let lostInventoryItems = [];
         if (inventory.length > 0) {
-            inventory.forEach(i => lostItems.push(i.name));
+            inventory.forEach(i => lostInventoryItems.push(i.name));
         }
+
+        // ✨ 核心改造：增加裝備噴落機制
+        let lostEquipItems = [];
+        const equipLossChance = 0.3; // 每件裝備有 30% 的機率噴掉
+        for (const slot in player.equipment) {
+            const item = player.equipment[slot];
+            if (item && Math.random() < equipLossChance) {
+                lostEquipItems.push(item.name);
+                player.equipment[slot] = null; // 從裝備欄移除
+            }
+        }
+
         // ✨ 改造：金錢損失改為 60% ~ 80% 的隨機浮動
         const goldLossPercent = 0.6 + Math.random() * 0.2; // 0.6 to 0.8
         let lostGold = Math.floor(player.gold * goldLossPercent);
 
         let summaryHtml = `<p>死因：${reason}</p>`;
         summaryHtml += `<p style="color:#f1c40f">💸 損失金錢：${lostGold} G</p>`;
-        if (lostItems.length > 0) {
-            summaryHtml += `<p style="color:#e74c3c">🎒 遺失物品：${lostItems.join(", ")}</p>`;
+        
+        const allLostItems = [...lostInventoryItems, ...lostEquipItems];
+        if (allLostItems.length > 0) {
+            summaryHtml += `<p style="color:#e74c3c">🎒 遺失物品：${allLostItems.join(", ")}</p>`;
         } else {
             summaryHtml += `<p>🎒 背包本來就是空的。</p>`;
         }
@@ -1505,7 +1543,7 @@ export function confirmName() { const input = document.getElementById("nameInput
 export function chooseJob(jobKey) { 
     // 1. 重置玩家屬性與裝備
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0; 
-    player.equipment = { head: null, body: null, weapon: null, accessory: null }; 
+    player.equipment = { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null }; 
     player.learnedSkills = []; 
     player.equippedSkills = []; 
 
@@ -1541,7 +1579,7 @@ export function chooseJob(jobKey) {
     } 
     
     // 3. 設定初始金錢與物品
-    player.gold = 100; 
+    player.gold = 1000; 
     stash.items = [];
     stash.gold = 0;
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
