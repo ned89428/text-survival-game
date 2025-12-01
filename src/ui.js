@@ -189,6 +189,10 @@ export function updateStatus(refill = false) {
             ${createBar("HP", "❤️", player.hp, player.maxHP, "red-bar")}
             ${createBar("MP", "💧", player.mp, player.maxMP, "blue-bar")}
             ${createBar("飢餓", "🍗", player.hunger, player.hungerMax, "yellow-bar")}
+            ${ (gameState.mode === 'explore' && gameState.pendingExp > 0) 
+                ? `<div class="small-label" style="color:#2ecc71; margin-top:8px;">🧭 暫存經驗：${gameState.pendingExp}</div>` 
+                : ''
+            }
             <div style="border-top:1px solid #444; margin: 10px 0;"></div>
                 <div class="small-label">物理攻擊：${Math.floor(player.atk)}</div>
                 <div class="small-label">魔法攻擊：${Math.floor(player.magicAtk)}</div>

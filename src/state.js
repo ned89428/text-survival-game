@@ -29,7 +29,8 @@ export let gameState = {
     lastActor: null,         // ✨ 新增：追蹤上一個行動者 ('player' 或 'enemy')
     merchantActive: false, // 是否在商人介面
     canSafelyRetreat: false, // ✨ 新增：能否安全撤離
-    merchantGoods: []
+    merchantGoods: [],
+    pendingExp: 0            // ✨ 修改：現在只用來儲存探索中暫存的「擊殺經驗」
 };
 
 // 3. 統計數據
@@ -140,6 +141,7 @@ export function resetGameData() {
     gameState.depth = 0; // ✨ 重置深度
     gameState.logs = []; 
     gameState.enemy = null; 
+    gameState.pendingExp = 0; // ✨ 重置暫存經驗
     gameState.canSafelyRetreat = false; gameState.isPlayerTurn = false; gameState.lastActor = null;
     gameState.inBattle = false; 
     gameState.isProcessingTurn = false; gameState.canAct = true; gameState.merchantActive = false; gameState.merchantGoods = [];

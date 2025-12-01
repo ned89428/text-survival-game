@@ -109,32 +109,36 @@ function queueBossBattle(bossId, warningMsg) {
     setTimeout(checkAndStart, 2000);
 }
 
-export function addExp(amount) {
+function gainExp(amount) {
+    if (amount <= 0) return;
+    UI.addLog(`--- 經驗結算：共獲得 ${amount} EXP ---`, "log-system");
     player.exp += amount;
-    while (player.exp >= player.expToLevel) { player.exp -= player.expToLevel; levelUp(); }
+    checkLevelUp();
     UI.updateStatus();
 }
-function levelUp() {
-    // 1. 移除升級獲得屬性點
-    player.level++; 
-    player.hp = player.maxHP; 
-    player.mp = player.maxMP;
-    player.hungerMax += 10; // ✨ 升級增加飢餓值上限
-    player.hunger = player.hungerMax; // ✨ 升級補滿飢餓值
-    UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
 
-    // === 新增：升級時自動學習技能 ===
-    SKILLS.forEach(skill => {
-        // 檢查 職業符合、等級達到、且尚未學過
-        if (skill.job === player.job && player.level >= skill.minLvl && !player.learnedSkills.includes(skill.id)) {
-            player.learnedSkills.push(skill.id);
-            // 預設自動裝備到前幾個技能欄 (如果需要)
-            if (player.equippedSkills.length < 4) { // 假設最多裝備4個技能
-                player.equippedSkills.push(skill.id);
+function checkLevelUp() {
+    // 使用 while 迴圈處理一次獲得大量經驗值時的連續升級
+    while (player.exp >= player.expToLevel) {
+        player.exp -= player.expToLevel;
+        player.level++;
+        player.hp = player.maxHP;
+        player.mp = player.maxMP;
+        player.hungerMax += 10;
+        player.hunger = player.hungerMax;
+        UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
+
+        // 升級時自動學習技能
+        SKILLS.forEach(skill => {
+            if (skill.job === player.job && player.level >= skill.minLvl && !player.learnedSkills.includes(skill.id)) {
+                player.learnedSkills.push(skill.id);
+                if (player.equippedSkills.length < 4) {
+                    player.equippedSkills.push(skill.id);
+                }
+                UI.addLog(`💡 你學會了新技能：${skill.name}！`, "log-system");
             }
-            UI.addLog(`💡 你學會了新技能：${skill.name}！`, "log-system");
-        }
-    });
+        });
+    }
     autoSave();
 }
 export function toggleInventory() { }
@@ -816,6 +820,7 @@ export function startExpedition(zoneId) {
     gameState.mode = "explore";
     gameState.currentZone = zoneId;
     gameState.depth = 1;
+    gameState.pendingExp = 0; // ✨ 核心：出發時重置暫存經驗
     
     // ✨ 核心改造：根據區域設定初始撤離狀態
     if (zoneId === 'nearby') {
@@ -824,7 +829,7 @@ export function startExpedition(zoneId) {
         gameState.canSafelyRetreat = false; // 地下城和遠征需要找到出口
     }
 
-    UI.addLog(`你出發前往 ${zoneName} 進行探索。`, "log-system");
+    UI.addLog(`你出發前往 ${zoneName} 進行探索。(經驗值將在撤離時結算)`, "log-system");
     UI.renderMainScreen();
     advanceDay(); // 每次出發都算一天
     autoSave();
@@ -844,11 +849,47 @@ export function advanceExploration(explorationType = 'default') {
     autoSave();
 }
 
-export function retreatToTown() {
+// ✨ 核心修正：將返回城鎮的清理工作抽離成獨立函式
+function returnToTownCleanup() {
     gameState.mode = "town";
     gameState.currentZone = null;
     gameState.canSafelyRetreat = false;
     gameState.depth = 0;
+    gameState.pendingExp = 0; // 結算完畢，歸零
+
+    // ✨ 新增：回到城鎮時，完全恢復 HP 和 MP
+    player.hp = player.maxHP;
+    player.mp = player.maxMP;
+
+    UI.addLog("你回到了城鎮。HP與MP已完全恢復。", "log-system");
+    UI.updateStatus(); // 更新狀態以顯示恢復後的血魔
+    UI.renderMainScreen();
+    autoSave();
+}
+
+export function retreatToTown() {
+    // ✨ 核心改造：安全撤離，套用新經驗公式
+    const killExp = gameState.pendingExp;
+    const depthExp = gameState.depth * 10;
+    const materialValue = inventory.reduce((sum, item) => {
+        const value = item.sellPrice || Math.floor((item.price || 0) / 2);
+        return sum + (value * (item.count || 1));
+    }, 0);
+    const materialExp = Math.floor(materialValue * 0.2);
+    const totalBaseExp = killExp + depthExp + materialExp;
+
+    if (totalBaseExp > 0) {
+        const multiplier = 1.2; // ✅ 安全撤離獎勵
+        const finalExp = Math.floor(totalBaseExp * multiplier);
+        UI.addLog(`✅ 安全撤離結算：(殺怪 ${killExp} + 探索 ${depthExp} + 物資 ${materialExp}) * ${multiplier} (獎勵) = ${finalExp} EXP`, "log-system");
+        gainExp(finalExp);
+    }
+
+    gameState.mode = "town";
+    gameState.currentZone = null;
+    gameState.canSafelyRetreat = false;
+    gameState.depth = 0;
+    gameState.pendingExp = 0; // 結算完畢，歸零
 
     // ✨ 新增：回到城鎮時，完全恢復 HP 和 MP
     player.hp = player.maxHP;
@@ -858,15 +899,33 @@ export function retreatToTown() {
     UI.updateStatus(); // 更新狀態以顯示恢復後的血魔
     UI.renderMainScreen();
     autoSave();
+    returnToTownCleanup(); // ✨ 呼叫新的清理函式
 }
 
 // ✨ 新增：強制撤離函式 (帶懲罰)
 export function forceRetreat() {
     if (gameState.mode !== 'explore') return;
+    
+    // ✨ 核心改造 1：加入確認提示
+    const confirmationMessage = "你確定要強制撤離嗎？\n\n這將會導致：\n- 隨機損失部分金錢與物品。\n- 最終獲得的經驗值會大幅減少。\n- 有 10% ~ 30% 的機率失敗並遭遇敵人！";
+    if (!confirm(confirmationMessage)) {
+        UI.addLog("你決定再堅持一下...", "log-system");
+        return;
+    }
 
     UI.addLog("你決定不顧一切地強制撤離...", "log-critical");
 
-    // 懲罰計算
+    // ✨ 核心改造 2：新增撤離失敗機制
+    const failureChance = 0.1 + Math.random() * 0.2; // 10% to 30%
+    if (Math.random() < failureChance) {
+        UI.addLog("🚫 撤離失敗！你在慌亂中驚動了附近的敵人！", "log-critical");
+        // 撤離失敗直接進入戰鬥，不執行後續的懲罰
+        startBattle(gameState.currentZone, gameState.depth, true); // 傳入 isAmbush 標記
+        return;
+    }
+
+    // --- 如果撤離成功，則執行懲罰 ---
+
     // ✨ 改造：金錢損失改為 30% ~ 50% 的隨機浮動
     const goldLossPercent = 0.3 + Math.random() * 0.2; // 0.3 to 0.5
     const lostGold = Math.floor(player.gold * goldLossPercent);
@@ -874,17 +933,50 @@ export function forceRetreat() {
     UI.addLog(`💸 慌亂中，你遺失了 ${lostGold} G。`, "log-system");
 
     // ✨ 改造：每個物品欄位都有 50% ~ 60% 的獨立機率遺失
-    let lostItemsLog = [];
+    // ✨ 核心改造 3：懲罰細化到堆疊內的每個物品
+    let lostItemsLog = {}; // 使用物件來統計丟失的物品
     for (let i = inventory.length - 1; i >= 0; i--) {
-        const dropChance = 0.5 + Math.random() * 0.1; // 50% to 60% chance
-        if (Math.random() < dropChance) {
-            const lostItem = inventory.splice(i, 1)[0];
-            lostItemsLog.push(`${lostItem.name} x${lostItem.count || 1}`);
+        const item = inventory[i];
+        const originalCount = item.count || 1;
+        let itemsLostInStack = 0;
+
+        // 遍歷堆疊中的每一個物品
+        for (let j = 0; j < originalCount; j++) {
+            const dropChance = 0.5 + Math.random() * 0.1; // 50% to 60% chance for each individual item
+            if (Math.random() < dropChance) {
+                itemsLostInStack++;
+            }
+        }
+
+        if (itemsLostInStack > 0) {
+            // 記錄到日誌物件中
+            if (!lostItemsLog[item.name]) lostItemsLog[item.name] = 0;
+            lostItemsLog[item.name] += itemsLostInStack;
+
+            // 更新背包中的物品數量
+            item.count -= itemsLostInStack;
+            if (item.count <= 0) {
+                inventory.splice(i, 1); // 如果數量歸零，則從背包移除
+            }
         }
     }
+    const lostItemsLogArray = Object.entries(lostItemsLog).map(([name, count]) => `${name} x${count}`);
+    if (lostItemsLogArray.length > 0) { UI.addLog(`🎒 為了逃跑，你丟棄了：${lostItemsLogArray.join("、 ")}。`, "log-system"); }
 
-    if (lostItemsLog.length > 0) {
-        UI.addLog(`🎒 為了逃跑，你丟棄了：${lostItemsLog.reverse().join("、 ")}。`, "log-system");
+    const killExp = gameState.pendingExp;
+    const depthExp = gameState.depth * 10;
+    const materialValue = inventory.reduce((sum, item) => { // 計算剩餘物品價值
+        const value = item.sellPrice || Math.floor((item.price || 0) / 2);
+        return sum + (value * (item.count || 1));
+    }, 0);
+    const materialExp = Math.floor(materialValue * 0.2);
+    const totalBaseExp = killExp + depthExp + materialExp;
+
+    if (totalBaseExp > 0) {
+        const multiplier = 0.4 + Math.random() * 0.3; // 🏳️ 強制撤離懲罰 (0.4 ~ 0.7)
+        const finalExp = Math.floor(totalBaseExp * multiplier);
+        UI.addLog(`🏳️ 強制撤離結算：(殺怪 ${killExp} + 探索 ${depthExp} + 物資 ${materialExp}) * ${multiplier.toFixed(2)} (懲罰) = ${finalExp} EXP`, "log-critical");
+        gainExp(finalExp);
     }
 
     // 10% 機率完美撤退 (範例)
@@ -894,6 +986,7 @@ export function forceRetreat() {
     }
 
     retreatToTown(); // 最後呼叫安全回城函式來重置狀態
+    returnToTownCleanup(); // ✨ 核心修正：最後呼叫新的清理函式來重置狀態
 }
 
 function startBossBattle(bossId) {
@@ -939,7 +1032,7 @@ function startBossBattle(bossId) {
     startInstantBattle(); // 啟動「瞬間 ATB」戰鬥
 }
 
-function startBattle(zone, difficulty = 1) {
+function startBattle(zone, difficulty = 1, isAmbush = false) {
     gameState.mode = "battle";
     gameState.inBattle = true;
     gameState.isProcessingTurn = false;
@@ -976,7 +1069,11 @@ function startBattle(zone, difficulty = 1) {
         gameState.enemy.killChance = 0.1;
     }
 
-    UI.addBattleLog(`遭遇敵人：${gameState.enemy.name} (Lv.${gameState.enemy.lvl})`, "log-battle");
+    if (isAmbush) {
+        UI.addBattleLog(`撤退失敗，遭遇伏擊：${gameState.enemy.name} (Lv.${gameState.enemy.lvl})`, "log-critical");
+    } else {
+        UI.addBattleLog(`遭遇敵人：${gameState.enemy.name} (Lv.${gameState.enemy.lvl})`, "log-battle");
+    }
     UI.renderMainScreen();
     startInstantBattle(); // 啟動「瞬間 ATB」戰鬥
 }
@@ -1269,10 +1366,16 @@ function winBattle() {
     gameState.mode = gameState.currentZone ? "explore" : "town"; 
     gameState.enemy = null; gameState.isProcessingTurn = false;
     UI.addLog(`🎉 擊敗了 ${enemy.name}！`, "log-battle");
-    addExp(enemy.exp || 10); stats.kills++;
+
+    // ✨ 核心：計算怪物經驗並加入暫存池
+    const baseExp = enemy.exp || 10;
+    const calculatedExp = Math.floor(baseExp * (1 + (enemy.lvl - enemy.minLvl) * 0.15));
+    gameState.pendingExp += calculatedExp;
+    UI.addLog(`[暫存經驗 +${calculatedExp}]`, "log-system");
+
+    stats.kills++;
     const goldGain = 5 + Math.floor(Math.random() * 11) + (enemy.lvl * 2);
     player.gold += goldGain; UI.addLog(`獲得 ${goldGain} G`, "log-system");
-    
 
     const baseDrop = enemy.dropRate || 0.1;
     const dropChance = baseDrop + (player.int * 0.01);
@@ -1333,7 +1436,7 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         // ✨ 改造：金錢損失改為 60% ~ 80% 的隨機浮動
         const goldLossPercent = 0.6 + Math.random() * 0.2; // 0.6 to 0.8
         let lostGold = Math.floor(player.gold * goldLossPercent);
-        
+
         let summaryHtml = `<p>死因：${reason}</p>`;
         summaryHtml += `<p style="color:#f1c40f">💸 損失金錢：${lostGold} G</p>`;
         if (lostItems.length > 0) {
@@ -1344,6 +1447,21 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         
         defeatSummary.innerHTML = summaryHtml;
 
+        // ✨ 核心改造：重傷撤退，在清空背包前計算經驗
+        const killExp = gameState.pendingExp;
+        const depthExp = gameState.depth * 10;
+        // 物資經驗為 0，因為所有東西都丟光了
+        const materialExp = 0;
+        const totalBaseExp = killExp + depthExp + materialExp;
+
+        if (totalBaseExp > 0) {
+            const multiplier = 0.2 + Math.random() * 0.1; // 💀 重傷懲罰 (0.2 ~ 0.3)
+            const finalExp = Math.floor(totalBaseExp * multiplier);
+            UI.addLog(`💀 重傷懲罰結算：(殺怪 ${killExp} + 探索 ${depthExp} + 物資 ${materialExp}) * ${multiplier.toFixed(2)} (重罰) = ${finalExp} EXP`, "log-critical");
+            gainExp(finalExp);
+        }
+
+
         inventory.length = 0;
         player.gold -= lostGold;
         player.hp = 1; 
@@ -1352,6 +1470,7 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         gameState.inBattle = false;
         gameState.mode = "town";
         gameState.enemy = null;
+        gameState.pendingExp = 0; // ✨ 核心修正：無論是否結算成功，都要在此歸零
         gameState.isProcessingTurn = false;
 
         document.getElementById("overlay").style.display = "flex";
@@ -1427,10 +1546,14 @@ export function chooseJob(jobKey) {
     stash.gold = 0;
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
 
-    // 4. 更新 UI 並開始遊戲
-    UI.updateInventory(); UI.updateStash();
-    player.hp = player.maxHP; player.mp = player.maxMP; UI.updateStatus(); document.getElementById("overlay").style.display = "none"; UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
+    // 4. 更新 UI 並開始遊戲 (核心修正：調整執行順序)
+    UI.updateInventory(); 
+    UI.updateStash();
+    UI.updateStatus(true); // ✨ 傳入 true，讓 recalcDerivedStats 直接補滿血魔
+
+    document.getElementById("overlay").style.display = "none"; 
+    UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
     UI.addLog(`獲得新手資助：100 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
-    gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave(); 
+    gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave();
 }
 export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
