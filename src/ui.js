@@ -1,5 +1,6 @@
 import { player, gameState, inventory, stash, recalcDerivedStats } from './state.js';
 import { SKILLS } from './data/skills.js';
+let trainingMessageTimer = null;
 
 // Helper
 function createBar(label, emoji, current, max, colorClass) {
@@ -10,10 +11,29 @@ function createBar(label, emoji, current, max, colorClass) {
 // Log System
 export function addLog(text, colorClass = "") {
     if (!gameState.logs) gameState.logs = [];
-    gameState.logs.push({ text, color: colorClass });
-    if (gameState.logs.length > 30) gameState.logs.shift();
+    gameState.logs.push({ text, color: colorClass }); // 將日誌加入陣列
+    if (gameState.logs.length > 30) gameState.logs.shift(); // 維持日誌數量上限
     renderMainScreen();
 }
+
+// ✨ 新增：只更新日誌，不重繪整個畫面的函式
+export function addLogWithoutRender(text, colorClass = "") {
+    if (!gameState.logs) gameState.logs = [];
+    gameState.logs.push({ text, color: colorClass });
+    if (gameState.logs.length > 30) gameState.logs.shift();
+
+    // 只重新渲染日誌區塊
+    const logDiv = document.querySelector(".mini-log");
+    if (logDiv) {
+        let style = "";
+        if (colorClass === "log-critical") style = "color:#ff7675";
+        else if (colorClass === "log-battle") style = "color:#f1c40f";
+        else if (colorClass === "log-system") style = "color:#74b9ff";
+        logDiv.innerHTML += `<div style="${style}">${text}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight; // 自動滾動到底部
+    }
+}
+
 export function writeEvent(text) { addLog(text.replace(/<[^>]*>/g, ""), ""); }
 export function addBattleLog(text, color) { addLog(text, color); }
 
@@ -96,7 +116,7 @@ export function renderMainScreen() {
         // 背包部分將由 updateInventory() 渲染，它會顯示「替換」按鈕
     } else if (gameState.mode === 'training') {
         // 3. 新增訓練場介面
-        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p></div>`;
+        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p><div id="trainingMessage" class="training-message"></div></div>`;
         let trainingButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">`;
         const cost = 0; // 根據要求，價格暫時為 0
         trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 1. 力量
@@ -148,6 +168,21 @@ export function triggerShake() {
     const box = document.getElementById("eventBox");
     box.classList.remove("shake");
     void box.offsetWidth; box.classList.add("shake");
+}
+
+export function showTrainingMessage(message) {
+    const msgDiv = document.getElementById('trainingMessage');
+    if (msgDiv) {
+        msgDiv.innerText = message;
+        msgDiv.style.opacity = 1;
+
+        if (trainingMessageTimer) {
+            clearTimeout(trainingMessageTimer);
+        }
+        trainingMessageTimer = setTimeout(() => {
+            msgDiv.style.opacity = 0;
+        }, 1500);
+    }
 }
 
 // Inventory & Stash Helpers

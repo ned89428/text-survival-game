@@ -717,13 +717,15 @@ export function trainAttribute(attribute) {
 
     player.gold -= cost;
     player[attribute]++; // 直接增加對應屬性
-    UI.addLog(`訓練成功！你的 ${attribute.toUpperCase()} 提升了。`, "log-system");
+    const message = `訓練成功！你的 ${attribute.toUpperCase()} 提升了。`;
+    UI.showTrainingMessage(message); // 顯示暫時訊息
+    UI.addLogWithoutRender(message, "log-system"); // ✨ 新增：只寫入日誌，不重繪整個畫面
 
     // ✨ 核心修正：如果訓練的是體質或智慧，則在更新狀態時直接補滿
     const shouldRefill = (attribute === 'con' || attribute === 'int');
     UI.updateStatus(shouldRefill);
 
-    UI.renderMainScreen(); // 重新渲染以更新價格
+    // UI.renderMainScreen(); // 不再需要完整重繪，由 showTrainingMessage 處理
     autoSave();
 }
 
