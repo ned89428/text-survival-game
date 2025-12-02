@@ -933,6 +933,9 @@ function triggerEvent(explorationType) {
     else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType, depth);
     else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
     else if (chosenEvent.type === 'boss') {
+        // ✨ 核心修正：先設定好狀態，再呼叫 UI 更新
+        gameState.mode = 'boss-encounter';
+        gameState.pendingBossId = chosenEvent.bossId;
         const bossName = ENEMIES.find(e => e.id === chosenEvent.bossId)?.name || "強大威脅";
         UI.addLog(`‼️ 你感覺到一股強大的氣息... 是 ${bossName}！`, "log-critical");
         gameState.mode = 'boss-encounter';
