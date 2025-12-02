@@ -1840,6 +1840,9 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
         gameState.inBattle = false;
         gameState.mode = "town";
         gameState.enemy = null;
+        // ✨ 核心修正：徹底清除舊的探索狀態，防止狀態污染
+        gameState.currentZone = null;
+        gameState.depth = 0;
         gameState.pendingExp = 0; // ✨ 核心修正：無論是否結算成功，都要在此歸零
         document.getElementById("overlay").style.display = "flex";
         document.getElementById("defeatPanel").style.display = "block";
