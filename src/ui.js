@@ -221,8 +221,8 @@ export function renderMainScreen() {
         }
     }
 
-    // ✨ 核心修正：商人模式的渲染邏輯已獨立處理，這裡排除掉它
-    if (gameState.mode !== 'merchant' && gameState.mode !== 'canteen') {
+    // ✨ 核心修正：商人模式的渲染邏輯已獨立處理，這裡排除掉它 (修正：食堂模式也需要獨立處理)
+    if (gameState.mode !== 'merchant') {
          box.innerHTML = `${topSection}${logSection}${actionButtons}`;
     }
     const logDiv = box.querySelector(".mini-log");
@@ -463,7 +463,7 @@ export function showTownActions() {
                 ${dungeonButton}
                 ${expeditionButton}
             </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
                 <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>
                 <button onclick="openTrainingGround()" style="background:#8e44ad;">💪 前往訓練場</button>
                 <button onclick="openCanteen()" style="background:#e67e22;">🍲 前往食堂</button>
