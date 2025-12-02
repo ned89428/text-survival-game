@@ -254,6 +254,11 @@ button:disabled {
 .job-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
 .job-desc { font-size: 13px; color: #aaa; }
 
+/* ✨ 新增：戰鬥介面置中 */
+.battle-box {
+    text-align: center;
+}
+
 /* 戰鬥動畫 */
 .shake { animation: shake 0.3s linear; }
 @keyframes shake {

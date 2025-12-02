@@ -1,5 +1,4 @@
 // src/data/events.js
-/* eslint-disable no-unused-vars */
 export const EVENTS = [
     // === ✨ 新增：保底用的氛圍事件 ===
     {
@@ -31,29 +30,22 @@ export const EVENTS = [
         }
     },
 
-
-    // === 通用事件 (所有區域都可能發生) ===
     {
-        id: "e_trip_over",
-        name: "不慎絆倒",
-        desc: "你被一根樹根絆倒，摔了一跤。",
-        type: "trap", // 陷阱/負面事件
-        chance: 10,
-        zones: ["nearby", "dungeon", "expedition"],
-        effects: [
-            { target: "hp", value: -5, message: "損失了 5 點HP。" }
-        ]
-    },
-    {
-        id: "e_rusty_key",
-        name: "生鏽的鑰匙",
-        desc: "你在一個骷髏旁找到一把生鏽的鑰匙，它似乎能打開什麼...",
-        type: "item", // 物品事件
+        id: "e_rusty_key_chest",
+        name: "生鏽的鎖箱",
+        desc: "你在一個骷髏旁找到一個上鎖的箱子，旁邊恰好有一把生鏽的鑰匙。要試著用它打開鎖箱嗎？",
+        type: "choice",
         chance: 10,
         zones: ["dungeon"],
-        effects: [
-            // 未來可以擴充，例如給予一個 "key" 物品
-        ]
+        minDepth: 5, // 只在地下城較深處出現
+        choices: [
+            { text: "使用鑰匙", action: "use_key" },
+            { text: "小心繞過", action: "ignore" }
+        ],
+        outcomes: {
+            use_key_success: { chance: 80, message: "鑰匙轉動了，你成功打開了鎖箱！", lootType: "treasure" },
+            use_key_failure: { chance: 20, message: "鑰匙在鎖孔裡應聲斷裂，你什麼也沒得到。", type: "neutral" }
+        }
     },
 
     // === 附近 (Nearby) 專屬事件 ===

@@ -72,6 +72,10 @@ function applyStateBonuses() {
 
 // 核心：數值計算公式
 export function recalcDerivedStats(refill = false) { 
+    // ✨ 核心修正：在每次計算前，先將衍生屬性歸零，避免重複累加
+    player.exitFindBonus = 0;
+    player.lootFindBonus = 0;
+
     // === 1. 彙總基礎屬性與裝備加成 ===
     let totalStr = player.str;
     let totalAgi = player.agi;

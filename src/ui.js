@@ -1,4 +1,5 @@
 import { player, gameState, inventory, stash, recalcDerivedStats } from './state.js';
+import { ENEMIES } from './data/enemies.js'; // ✨ 核心修正：引入 ENEMIES 資料
 import { SKILLS } from './data/skills.js';
 let trainingMessageTimer = null;
 
@@ -84,6 +85,22 @@ export function renderMainScreen() {
         // 戰鬥中隱藏倉庫
         const stashBox = document.getElementById("stashBox");
         if(stashBox) stashBox.style.display = "none";
+
+    } else if (gameState.mode === 'canteen') {
+        // ✨ 新增：食堂介面
+        const hungerToFill = player.hungerMax - player.hunger;
+        // 定價策略：每點飢餓 0.4G，比商店買乾糧 (0.5G/點) 便宜
+        const cost = Math.ceil(hungerToFill * 0.4);
+
+        topSection = `
+            <div style="text-align:center; margin-bottom:10px;">
+                <div style="font-size: 60px;">🍲</div>
+                <h3>食堂</h3>
+                <p>「冒險者，餓了嗎？來碗熱騰騰的吧！」</p>
+            </div>`;
+        actionButtons = `
+            <button onclick="eatAtCanteen(${cost})" style="width: 80%; margin: 10px auto; display: block; background: #27ae60;" ${hungerToFill === 0 ? 'disabled' : ''}>飽餐一頓 (補滿飢餓)<br><span style="color:#f1c40f">價格: ${cost} G</span></button>
+            <div style="margin-top:10px; text-align:center;"><button onclick="closeCanteen()">離開食堂</button></div>`;
 
     } else if (gameState.mode === "merchant") {
         const merchantName = gameState.merchantName || '商人';
@@ -443,6 +460,7 @@ export function showTownActions() {
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                 <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>
                 <button onclick="openTrainingGround()" style="background:#8e44ad;">💪 前往訓練場</button>
+                <button onclick="openCanteen()" style="background:#e67e22;">🍲 前往食堂</button>
             </div>`;
         act.style.display = "block";
     }

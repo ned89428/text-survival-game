@@ -371,41 +371,42 @@ function getWeightedRandomItem(items, bonusWeight = 0) {
     return validItems[validItems.length - 1];
 }
 
-function lootRandomItem(type, depth = 0) {
+function generateLoot(type, depth = 0, specificItem = null) {
     let newItem = null;
-
     if (type === "food") {
         const foodItems = CONSUMABLES.filter(c => c.id.includes("food_"));
         const chosenItem = getWeightedRandomItem(foodItems);
         if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
-    } else if (type === "treasure") { // ✨ 核心改造：寶藏現在會生成隨機裝備
+    } else if (type === "treasure") {
         if (Math.random() < 0.6) {
-            // 60% 機率是隨機裝備
             newItem = generateRandomEquipment(player.level, depth);
         } else {
-            // 40% 機率是隨機消耗品
             const chosenItem = getWeightedRandomItem(CONSUMABLES);
             if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
         }
+    } else if (specificItem) {
+        newItem = specificItem;
     } else if (type === "material") {
         newItem = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true };
     }
-    
+    return newItem;
+}
+
+function handleLoot(newItem) {
     if (!newItem) return;
 
-    // ✨ 核心改造：檢查背包空間
     if (canBeAddedToInventory(newItem)) {
         addToInventory(newItem);
         UI.addLog(`🎁 你找到了 ${newItem.name}，已放入背包。`, "log-system");
         UI.updateInventory();
+        autoSave();
     } else {
-        // 背包已滿，進入替換模式
         gameState.pendingLoot = newItem;
         gameState.mode = 'loot-swap';
         UI.addLog(`🎒 背包已滿！你發現了 ${newItem.name}，要替換嗎？`, "log-system");
         UI.renderMainScreen();
+        // 此處不存檔，等待玩家做出選擇
     }
-    autoSave();
 }
 
 // ✨ 新增：處理拾取替換的函式
@@ -786,6 +787,36 @@ export function trainAttribute(attribute) {
     autoSave();
 }
 
+// ================== 食堂系統 (新增) ==================
+
+export function openCanteen() {
+    gameState.mode = "canteen";
+    UI.addLog("你走進了溫暖的食堂。");
+    UI.renderMainScreen();
+}
+
+export function closeCanteen() {
+    gameState.mode = "town";
+    UI.addLog("你離開了食堂。");
+    UI.renderMainScreen();
+}
+
+export function eatAtCanteen(cost) {
+    if (gameState.mode !== 'canteen') return;
+
+    if (player.gold < cost) {
+        UI.addLog(`金錢不足，你需要 ${cost} G。`, "log-system");
+        return;
+    }
+
+    player.gold -= cost;
+    player.hunger = player.hungerMax;
+    UI.addLog(`你飽餐了一頓，飢餓值完全恢復了！(-${cost} G)`, "log-system");
+    UI.updateStatus();
+    UI.renderMainScreen(); // 刷新以更新價格
+    autoSave();
+}
+
 // ================== 探索與戰鬥系統 ==================
 function startCooldown(seconds) {
     if (seconds <= 0) { gameState.canAct = true; UI.renderMainScreen(); return; }
@@ -930,7 +961,10 @@ function triggerEvent(explorationType) {
     
     // 根據事件類型執行動作
     if (chosenEvent.type === 'combat') startBattle(zone, depth);
-    else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType, depth);
+    else if (chosenEvent.type === 'loot') {
+        const newItem = generateLoot(chosenEvent.lootType, depth);
+        handleLoot(newItem);
+    }
     else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
     else if (chosenEvent.type === 'boss') {
         // ✨ 核心修正：先設定好狀態，再呼叫 UI 更新
@@ -938,9 +972,6 @@ function triggerEvent(explorationType) {
         gameState.pendingBossId = chosenEvent.bossId;
         const bossName = ENEMIES.find(e => e.id === chosenEvent.bossId)?.name || "強大威脅";
         UI.addLog(`‼️ 你感覺到一股強大的氣息... 是 ${bossName}！`, "log-critical");
-        gameState.mode = 'boss-encounter';
-        gameState.pendingBossId = chosenEvent.bossId;
-        UI.renderMainScreen();
     } else if (chosenEvent.type === 'choice') {
         // ✨ 核心改造：處理選擇事件
         gameState.mode = 'choice';
@@ -978,7 +1009,10 @@ export function handleChoiceEvent(action) {
     if (Math.random() * 100 < successOutcome.chance) {
         // 成功
         UI.addLog(`✅ ${successOutcome.message}`, "log-system");
-        if (successOutcome.lootType) lootRandomItem(successOutcome.lootType, gameState.depth);
+        if (successOutcome.lootType) {
+            const newItem = generateLoot(successOutcome.lootType, gameState.depth);
+            handleLoot(newItem);
+        }
     } else {
         // 失敗
         UI.addLog(`❌ ${failureOutcome.message}`, "log-critical");
@@ -987,7 +1021,7 @@ export function handleChoiceEvent(action) {
 
     gameState.mode = 'explore';
     gameState.currentEvent = null;
-    // lootRandomItem 和 startBattle 會自己呼叫 renderMainScreen 和 autoSave
+    // handleLoot 和 startBattle 會自己呼叫 renderMainScreen 和 autoSave
 }
 
 // ✨ 新增：當旅行計時結束後，呼叫此函式以抵達目的地
@@ -1633,22 +1667,34 @@ function winBattle() {
     gameState.pendingExp += calculatedExp;
     UI.addLog(`[暫存經驗 +${calculatedExp}]`, "log-system");
 
+    // ✨ 核心改造：全新的掉落物系統
     stats.kills++;
-    const goldGain = 5 + Math.floor(Math.random() * 11) + (enemy.lvl * 2);
-    player.gold += goldGain; UI.addLog(`獲得 ${goldGain} G`, "log-system");
 
+    // 1. 必定掉落「怪物素材」，其價值與怪物強度掛鉤
+    const materialValue = Math.max(1, Math.floor(enemy.exp / 2 + enemy.lvl * 1.5));
+    const materialItem = {
+        id: `mat_${enemy.id}`,
+        name: `${enemy.name}的戰利品`, // 例如：森林巨熊的戰利品
+        emoji: '🛍️',
+        type: 'material',
+        sellPrice: materialValue,
+        usable: false,
+        stackable: true,
+        desc: `可出售換錢 (${materialValue} G)`
+    };
+    handleLoot(materialItem);
+
+    // 2. 在必定掉落素材的基礎上，額外有機率掉落隨機裝備
     const baseDrop = enemy.dropRate || 0.1;
     const dropChance = baseDrop + (player.int * 0.01);
     if (Math.random() < dropChance) {
-        if (Math.random() < 0.8) {
-            const newItem = generateRandomEquipment(enemy.lvl, gameState.depth); 
-            inventory.push(newItem); 
-        } else { lootRandomItem("treasure"); }
-        UI.updateInventory();
+        UI.addLog("✨ 運氣不錯！敵人身上還有額外的戰利品！", "log-system");
+        const extraLoot = generateLoot("treasure", gameState.depth);
+        handleLoot(extraLoot);
     }
-    UI.updateStatus(); UI.renderMainScreen(); autoSave();
-} // 修正：移除多餘的 "ate.inBattle = false; gameState.mode = "town"; gameState.enemy = null; gameState.isProcessingTurn = false;"
 
+    UI.updateStatus(); UI.renderMainScreen(); autoSave();
+}
 
 function gameClear() {
     gameState.inBattle = false; gameState.mode = "town"; gameState.enemy = null; gameState.isProcessingTurn = false;

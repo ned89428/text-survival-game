@@ -63,6 +63,11 @@ try {
     window.closeTrainingGround = Game.closeTrainingGround;
     window.trainAttribute = Game.trainAttribute;
 
+    // 7. 食堂相關 (新增)
+    window.openCanteen = Game.openCanteen;
+    window.closeCanteen = Game.closeCanteen;
+    window.eatAtCanteen = Game.eatAtCanteen;
+
     console.log("所有函式掛載完成！檢查商人函式: ", window.closeMerchant);
 
 } catch (e) {
