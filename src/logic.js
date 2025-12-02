@@ -2,7 +2,7 @@ import { player, gameState, stats, inventory, stash, COOLDOWNS, resetGameData } 
 import * as UI from './ui.js';
 import { ENEMIES } from './data/enemies.js';
 import { EVENTS } from './data/events.js'; // ✨ 1. 導入新的事件資料
-import { EQUIP_TEMPLATES, ITEM_PREFIXES, CONSUMABLES } from './data/items.js';
+import { EQUIP_TEMPLATES, ITEM_PREFIXES, CONSUMABLES, ITEM_ENCHANTMENTS } from './data/items.js';
 import { MERCHANTS } from './data/merchants.js';
 import { SKILLS } from './data/skills.js'; 
 
@@ -555,7 +555,11 @@ export function sellOneItem(i) {
 
     player.gold += sellValue; 
     UI.addLog(`賣出 ${item.name} (+${sellValue} G)`, "log-system"); 
-    if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateStatus(); UI.updateInventory(); renderMerchantUI(); autoSave(); 
+    if(item.count > 1) item.count--; else inventory.splice(i, 1); 
+    UI.updateStatus(); 
+    UI.updateInventory(); 
+    renderMerchantUI(`售出 ${item.name}，獲得 ${sellValue} G。`); // ✨ 核心修正：使用新的商人訊息系統
+    autoSave(); 
 }
 export function dropItem(i) { const item = inventory[i]; UI.addLog(`丟棄了 ${item.name}`, "log-system"); if(item.count > 1) item.count--; else inventory.splice(i, 1); UI.updateInventory(); autoSave(); }
 
@@ -650,8 +654,11 @@ function maybeMerchant(from) {
 }
 
 function renderMerchantUI(message = "") {
-    if(message) UI.addLog(message, "log-system");
+    // ✨ 核心修正：不再使用 addLog，而是更新一個專用的商人訊息狀態
+    // 這樣可以避免每次操作都拉長日誌區塊
+    gameState.merchantMessage = message;
     UI.renderMainScreen();
+    gameState.merchantMessage = ""; // 顯示後立即清除，使其只顯示一次
 }
 
 // 通用的開啟商人介面函式
@@ -663,6 +670,7 @@ function openMerchant(merchantType) {
     gameState.mode = "merchant";
     gameState.isTownMerchant = (merchantType === 'TOWN'); // 只有城鎮商人才標記
     gameState.merchantName = merchantData.name; // ✨ 設定商人名稱
+    gameState.merchantMessage = ""; // ✨ 初始化商人訊息
     
     gameState.merchantGoods = populateMerchantGoods(merchantType);
     
@@ -704,7 +712,7 @@ export function buyItem(index) {
     // ✨ 核心修正：購買前先檢查背包空間
     if (!canBeAddedToInventory(item)) {
         UI.addLog("🎒 背包已滿！無法購買此物品。", "log-system");
-        renderMerchantUI(); // 刷新商人介面以顯示訊息
+        // renderMerchantUI(); // 此處不再需要刷新，因為 addLog 已經會刷新 UI
         return;
     }
 
@@ -717,8 +725,8 @@ export function buyItem(index) {
     addToInventory({ ...item });
     UI.updateStatus(); 
     UI.updateInventory(); 
-    UI.addLog(`購買了 ${item.name}`, "log-system");
-    renderMerchantUI(`感謝購買！已獲得 ${item.name}。`); 
+    // ✨ 核心修正：將購買訊息傳遞給 renderMerchantUI
+    renderMerchantUI(`感謝購買！你獲得了 ${item.name}。`); 
     autoSave();
 }
 
@@ -739,6 +747,7 @@ export function closeMerchant() {
     gameState.merchantGoods = []; 
     gameState.isTownMerchant = false;
     gameState.merchantName = null; // ✨ 清除商人名稱
+    gameState.merchantMessage = ""; // ✨ 清除商人訊息
     gameState.mode = gameState.currentZone ? "explore" : "town";
     gameState.merchantName = null;
 
@@ -961,11 +970,11 @@ function triggerEvent(explorationType) {
 
     let chosenEvent = getWeightedRandomItem(validEvents);
 
-    // ✨ 核心改造：如果沒有任何事件被選中，則觸發一個預設的保底氛圍事件
+    // ✨ 核心修正：如果根據權重沒有抽中任何事件，則明確告知玩家「什麼也沒發生」。
+    // 這解決了探索時偶爾會沒有任何訊息輸出的問題。
     if (!chosenEvent) {
-        chosenEvent = EVENTS.find(e => e.id === 'e_eerie_silence');
-        // 如果連保底事件都找不到，才顯示「什麼也沒發生」
-        if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
+        UI.addLog("什麼也沒發生...", "log-system");
+        return;
     }
     
     // 根據事件類型執行動作
@@ -1027,10 +1036,14 @@ export function handleChoiceEvent(action) {
         UI.addLog(`❌ ${failureOutcome.message}`, "log-critical");
         if (failureOutcome.type === 'combat') startBattle(gameState.currentZone, gameState.depth);
     }
-
-    gameState.mode = 'explore';
-    gameState.currentEvent = null;
-    // handleLoot 和 startBattle 會自己呼叫 renderMainScreen 和 autoSave
+    // ✨ 核心修正：只有在沒有觸發戰鬥或拾取的情況下，才手動將狀態改回 explore
+    // 如果觸發了 loot-swap 或 battle，則由對應的函式 (handleLoot, startBattle) 負責後續的狀態管理
+    if (gameState.mode === 'choice') {
+        gameState.mode = 'explore';
+        gameState.currentEvent = null;
+        UI.renderMainScreen(); // 手動刷新一次UI
+        autoSave();
+    }
 }
 
 // ✨ 新增：當旅行計時結束後，呼叫此函式以抵達目的地
@@ -1897,19 +1910,26 @@ export function chooseJob(jobKey) {
     } 
     
     // 3. 設定初始金錢與物品
-    player.gold = 150; 
+    player.gold = 200; // 
     stash.items = [];
     stash.gold = 0;
+
+    const smallHealPotion = CONSUMABLES.find(c => c.id === 'potion_heal_s');
+    const smallManaPotion = CONSUMABLES.find(c => c.id === 'potion_mana_s');
+
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
+    if (smallHealPotion) stash.items.push({ ...smallHealPotion, count: 1 });
+    if (smallManaPotion) stash.items.push({ ...smallManaPotion, count: 1 });
 
     // 4. 更新 UI 並開始遊戲 (核心修正：調整執行順序)
     UI.updateInventory(); 
     UI.updateStash();
     UI.updateStatus(true); // ✨ 傳入 true，讓 recalcDerivedStats 直接補滿血魔
 
-    document.getElementById("overlay").style.display = "none"; 
-    UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
-    UI.addLog(`獲得新手資助：150 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
+    document.getElementById("overlay").style.display = "none";
+    UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system");
+    // ✨ 核心修改：更新提示訊息
+    UI.addLog(`獲得新手資助：200 G、3 個乾糧包、1 瓶小回復藥水、1 瓶小魔力藥水 (已存入倉庫)`, "log-system");
     gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave();
 }
 export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }

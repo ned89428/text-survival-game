@@ -87,9 +87,7 @@ export function renderMainScreen() {
         if(stashBox) stashBox.style.display = "none";
 
     } else if (gameState.mode === 'canteen') {
-        // ✨ 新增：食堂介面
         const hungerToFill = player.hungerMax - player.hunger;
-        // 定價策略：每點飢餓 0.4G，比商店買乾糧 (0.5G/點) 便宜
         const cost = Math.ceil(hungerToFill * 0.4);
 
         topSection = `
@@ -103,16 +101,24 @@ export function renderMainScreen() {
             <div style="margin-top:10px; text-align:center;"><button onclick="closeCanteen()">離開食堂</button></div>`;
 
     } else if (gameState.mode === "merchant") {
+        // ✨ 核心修正：當在商人介面時，給日誌區塊加上最大高度和滾動條
+        // 這樣即使日誌增加，也不會推擠下方的倉庫區塊
+        const logSectionWithScroll = `<div class="mini-log" style="max-height: 150px; overflow-y: auto;">${logHtml}</div>`;
         const merchantName = gameState.merchantName || '商人';
-        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>${merchantName}</h3><p>「看看有什麼需要的？」</p></div>`;
+        const message = gameState.merchantMessage 
+            ? `<p style="color: #f1c40f; height: 20px;">${gameState.merchantMessage}</p>`
+            : `<p style="height: 20px;">「看看有什麼需要的？」</p>`;
+
+        topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">🤠</div><h3>${merchantName}</h3>${message}</div>`;
+
         let goodsHtml = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">`;
         gameState.merchantGoods.forEach((g, i) => {
             goodsHtml += `<button onclick="buyItem(${i})" style="font-size:14px;">${g.emoji} ${g.name}<br><span style="color:#f1c40f">${g.price} G</span></button>`;
         });
         goodsHtml += `</div>`;
         actionButtons = `${goodsHtml}<div style="margin-top:10px; text-align:center;"><button onclick="sellAllMaterials()">出售所有素材</button><button onclick="closeMerchant()">離開商人</button></div>`;
-        
-        // 商人模式隱藏倉庫
+        // ✨ 核心修正：將帶有滾動條的日誌區塊加回商人介面
+        box.innerHTML = `${topSection}${logSectionWithScroll}${actionButtons}`;
     } else if (gameState.mode === 'loot-swap') {
         // ✨ 核心修正：將 loot-swap 的邏輯移到正確的區塊
         const newItem = gameState.pendingLoot;
@@ -215,7 +221,10 @@ export function renderMainScreen() {
         }
     }
 
-    box.innerHTML = `${topSection}${logSection}${actionButtons}`;
+    // ✨ 核心修正：商人模式的渲染邏輯已獨立處理，這裡排除掉它
+    if (gameState.mode !== 'merchant' && gameState.mode !== 'canteen') {
+         box.innerHTML = `${topSection}${logSection}${actionButtons}`;
+    }
     const logDiv = box.querySelector(".mini-log");
     if(logDiv) logDiv.scrollTop = logDiv.scrollHeight;
     
@@ -229,11 +238,8 @@ export function renderMainScreen() {
         const eventBox = document.getElementById('eventBox');
         const statusBox = document.getElementById('statusBox');
         const inventoryBox = document.getElementById('inventoryBox');
-        if (eventBox && statusBox && inventoryBox) {
-            // ✨ 核心修正：在訓練場、戰鬥、旅行模式下，不同步高度，避免佈局跳動
-            if (gameState.mode !== 'training' && gameState.mode !== 'battle' && gameState.mode !== 'traveling') {
-                inventoryBox.style.height = `${eventBox.offsetHeight}px`;
-            }
+        if (eventBox && statusBox && inventoryBox && gameState.mode !== 'training' && gameState.mode !== 'battle' && gameState.mode !== 'traveling' && gameState.mode !== 'merchant') {
+            inventoryBox.style.height = `${eventBox.offsetHeight}px`;
         }
     });
 }
