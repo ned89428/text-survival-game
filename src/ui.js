@@ -97,6 +97,24 @@ export function renderMainScreen() {
         
         // 商人模式隱藏倉庫
     } else if (gameState.mode === 'loot-swap') {
+        // ✨ 核心修正：將 loot-swap 的邏輯移到正確的區塊
+        const newItem = gameState.pendingLoot;
+        if (newItem) {
+            const statsDesc = newItem.type === "equip" ? `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(newItem.stats)}</div>` : (newItem.desc ? `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${newItem.desc}</div>` : "");
+            topSection = `
+                <div style="text-align:center; margin-bottom:10px;">
+                    <div style="font-size: 24px; color: #f1c40f;">🎒 背包已滿！</div>
+                    <p>你發現了新物品，要替換掉一個舊的嗎？</p>
+                    <div class="inv-item" style="background: #222; justify-content: center;">
+                       <div style="text-align:left;">
+                           <div>${newItem.emoji} ${newItem.name}</div>
+                           ${statsDesc}
+                       </div>
+                    </div>
+                </div>`;
+            actionButtons = `<div style="margin-top:10px; text-align:center;"><button onclick="discardPendingLoot()" style="background:#c0392b;">丟棄新物品</button></div>`;
+        }
+        // 背包部分將由 updateInventory() 渲染，它會顯示「替換」按鈕
     } else if (gameState.mode === 'choice') {
         // ✨ 新增：選擇事件的 UI
         const event = gameState.currentEvent;
@@ -131,23 +149,6 @@ export function renderMainScreen() {
                     <button onclick="avoidBossBattle()" style="background:#2c3e50;">🤫 小心繞過</button>
                 </div>`;
         }
-        const newItem = gameState.pendingLoot;
-        if (newItem) {
-            const statsDesc = newItem.type === "equip" ? `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(newItem.stats)}</div>` : (newItem.desc ? `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${newItem.desc}</div>` : "");
-            topSection = `
-                <div style="text-align:center; margin-bottom:10px;">
-                    <div style="font-size: 24px; color: #f1c40f;">🎒 背包已滿！</div>
-                    <p>你發現了新物品，要替換掉一個舊的嗎？</p>
-                    <div class="inv-item" style="background: #222; justify-content: center;">
-                       <div style="text-align:left;">
-                           <div>${newItem.emoji} ${newItem.name}</div>
-                           ${statsDesc}
-                       </div>
-                    </div>
-                </div>`;
-            actionButtons = `<div style="margin-top:10px; text-align:center;"><button onclick="discardPendingLoot()" style="background:#c0392b;">丟棄新物品</button></div>`;
-        }
-        // 背包部分將由 updateInventory() 渲染，它會顯示「替換」按鈕
     } else if (gameState.mode === 'training') {
         // 3. 新增訓練場介面
         topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p><div id="trainingMessage" class="training-message"></div></div>`;
