@@ -12,7 +12,10 @@ export let player = {
     hp: 100, maxHP: 100, mp: 20, maxMP: 20, actionGauge: 0, // 新增玩家行動條
     hunger: 100, hungerMax: 100,
     atk: 5, magicAtk: 0, def: 0, dodge: 0, hitRate: 80, speed: 10, critChance: 5, critDamage: 150,
-    gold: 0, state: "正常", alive: true
+    gold: 0, state: "正常", alive: true, statusDuration: 0, // ✨ 新增：狀態持續時間
+    // ✨ 新增：探索相關衍生屬性
+    exitFindBonus: 0,
+    lootFindBonus: 0,
 };
 
 // 2. 遊戲全域狀態
@@ -58,6 +61,13 @@ function applyStateBonuses() {
     if (player.state === "祝福") { player.atk += 5; player.magicAtk += 5; player.critChance += 5; } 
     else if (player.state === "詛咒") { player.atk = Math.max(1, player.atk - 5); player.def = Math.max(0, player.def - 2); } 
     else if (player.state === "疲勞") { player.speed -= 5; player.dodge -= 10; player.hitRate -= 10; }
+    // ✨ 核心改造：為「重傷」狀態賦予實際懲罰效果
+    else if (player.state === "重傷") {
+        player.atk *= 0.7;      // 攻擊力降低 30%
+        player.def *= 0.7;      // 防禦力降低 30%
+        player.hitRate -= 15;   // 命中率降低 15
+        player.dodge -= 15;     // 閃避值降低 15
+    }
 }
 
 // 核心：數值計算公式
@@ -67,7 +77,7 @@ export function recalcDerivedStats(refill = false) {
     let totalAgi = player.agi;
     let totalCon = player.con;
     let totalInt = player.int;
-    let totalTec = player.tec;
+    let totalTec = player.tec; // ... 其他屬性初始化
     let bonusAtk = 0, bonusDef = 0, bonusMagic = 0, bonusHP = 0, bonusMP = 0, bonusSlots = 0;
 
     Object.values(player.equipment).forEach(item => {
@@ -81,8 +91,15 @@ export function recalcDerivedStats(refill = false) {
             bonusMagic += (item.stats.magicAtk || 0); bonusHP += (item.stats.hp || 0);
             bonusMP += (item.stats.mp || 0);
             bonusSlots += (item.stats.slots || 0); // ✨ 核心：累加裝備提供的欄位
+
+            // ✨ 核心改造：累加探索屬性
+            player.exitFindBonus += (item.stats.exitFindBonus || 0);
+            player.lootFindBonus += (item.stats.lootFindBonus || 0);
         }
     });
+    // ✨ 核心改造：從裝備基底也累加探索屬性
+    player.exitFindBonus += (player.equipment.accessory?.exitFindBonus || 0);
+
 
     // === 1.5. 計算背包容量 ===
     const baseSlots = 8; // 玩家的基礎背包容量
@@ -148,7 +165,7 @@ export function resetGameData() {
     player.hp = 100; player.maxHP = 100; player.mp = 20; player.maxMP = 20;
     player.hunger = 100; player.hungerMax = 100;
     player.atk = 5; player.magicAtk = 0; player.def = 0; player.dodge = 0; player.hitRate = 80; player.speed = 10; player.critChance = 5; player.critDamage = 150;
-    player.gold = 0; player.state = "正常"; player.alive = true;
+    player.gold = 0; player.state = "正常"; player.alive = true; player.statusDuration = 0; // ✨ 重置狀態持續時間
 
     gameState.mode = "town"; // ✨ 重置為 town 模式
     gameState.currentZone = null; // ✨ 重置目前區域

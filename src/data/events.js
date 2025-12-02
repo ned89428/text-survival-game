@@ -1,6 +1,16 @@
 // src/data/events.js
 
 export const EVENTS = [
+    // === ✨ 新增：保底用的氛圍事件 ===
+    {
+        id: "e_eerie_silence",
+        name: "詭異的寂靜",
+        desc: "周圍突然變得異常安靜，讓你感到一絲不安。",
+        type: "neutral", // 中性/氛圍事件
+        chance: 0, // 權重為 0，正常情況下不會被抽到
+        zones: ["nearby", "dungeon", "expedition"],
+        effects: [] // 沒有實際效果
+    },
     // === 通用事件 (所有區域都可能發生) ===
     {
         id: "e_trip_over",
@@ -12,15 +22,6 @@ export const EVENTS = [
         effects: [
             { target: "hp", value: -5, message: "損失了 5 點HP。" }
         ]
-    },
-    {
-        id: "e_eerie_silence",
-        name: "詭異的寂靜",
-        desc: "周圍突然變得異常安靜，讓你感到一絲不安。",
-        type: "neutral", // 中性/氛圍事件
-        chance: 20,
-        zones: ["nearby", "dungeon", "expedition"],
-        effects: [] // 沒有實際效果
     },
 
     // === 附近 (Nearby) 專屬事件 ===
@@ -61,6 +62,18 @@ export const EVENTS = [
         ]
     },
 
+    // === ✨ 新增：可能導致重傷的事件 ===
+    {
+        id: "e_bad_fall",
+        name: "嚴重扭傷",
+        desc: "你在濕滑的地面上重重摔倒，感覺筋骨都錯位了。",
+        type: "trap",
+        chance: 5,
+        zones: ["dungeon", "expedition"], // 只在較危險的區域發生
+        effects: [
+            { target: "state", value: "重傷", message: "你陷入了重傷狀態！(探索3次後解除)" }
+        ]
+    },
     // === 遠征 (Expedition) 專屬事件 ===
     {
         id: "e_ancient_fountain",

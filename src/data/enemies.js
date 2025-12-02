@@ -1,6 +1,17 @@
 export const ENEMIES = [
     // === Lv 1-3: 新手區 (Nearby) ===
     {
+        id: "mushroom",
+        name: "走路菇",
+        emoji: "🍄",
+        minLvl: 1,
+        baseHp: 20, baseAtk: 4, baseDef: 0,
+        exp: 8,
+        baseStr: 2, baseAgi: 2, baseCon: 3, baseTec: 1, baseSpeed: 6, // 非常弱
+        dropRate: 0.1,
+        zone: "nearby"
+    },
+    {
         id: "slime",
         name: "史萊姆",
         emoji: "🟢",  // <--- 新增這個
@@ -46,6 +57,17 @@ export const ENEMIES = [
         zone: "nearby"
     },
     {
+        id: "goblin_scout",
+        name: "哥布林斥侯",
+        emoji: "👺",
+        minLvl: 4, // 較高 minLvl，適合在深層出現
+        baseHp: 60, baseAtk: 16, baseDef: 2,
+        exp: 30,
+        baseStr: 7, baseAgi: 10, baseCon: 5, baseTec: 8, baseSpeed: 16,
+        dropRate: 0.25,
+        zone: "nearby" // 雖然是哥布林，但出現在附近區域的深處
+    },
+    {
         id: "boar",
         name: "狂暴野豬",
         emoji: "🐗",
@@ -72,6 +94,17 @@ export const ENEMIES = [
     },
 
     // === Lv 4-7: 地下城 (Dungeon) ===
+    {
+        id: "dungeon_rat",
+        name: "地城巨鼠",
+        emoji: "🐀",
+        minLvl: 4, // 地下城的入門怪
+        baseHp: 70, baseAtk: 14, baseDef: 1,
+        exp: 30,
+        baseStr: 6, baseAgi: 9, baseCon: 4, baseTec: 5, baseSpeed: 14,
+        dropRate: 0.2,
+        zone: "dungeon"
+    },
     {
         id: "goblin",
         name: "哥布林",
@@ -127,6 +160,17 @@ export const ENEMIES = [
         dropRate: 0.4,
         zone: "dungeon"
     },
+    {
+        id: "ogre",
+        name: "食人魔",
+        emoji: "👹",
+        minLvl: 8, // 地下城深層的精英怪
+        baseHp: 250, baseAtk: 30, baseDef: 8,
+        exp: 120,
+        baseStr: 20, baseAgi: 4, baseCon: 18, baseTec: 5, baseSpeed: 8, // 典型的笨重力量型
+        dropRate: 0.5,
+        zone: "dungeon"
+    },
     // === 新增：地下城 BOSS ===
     {
         id: "boss_goblin_king",
@@ -144,6 +188,17 @@ export const ENEMIES = [
 
 
     // === Lv 8+: 遠征 (Expedition) ===
+    {
+        id: "harpy",
+        name: "鷹身女妖",
+        emoji: "🐦",
+        minLvl: 9,
+        baseHp: 280, baseAtk: 40, baseDef: 5,
+        exp: 250,
+        baseStr: 15, baseAgi: 28, baseCon: 15, baseTec: 20, baseSpeed: 25, // 極高閃避和速度
+        dropRate: 0.6,
+        zone: "expedition"
+    },
     {
         id: "orc",
         name: "半獸人戰士",
@@ -195,7 +250,7 @@ export const ENEMIES = [
         id: "mimic",
         name: "寶箱怪",
         emoji: "📦",
-        minLvl: 5,
+        minLvl: 6,
         baseHp: 150, baseAtk: 20, baseDef: 10,
         exp: 100,
         baseStr: 15, baseAgi: 1, baseCon: 10, baseTec: 15, baseSpeed: 5, // 偽裝者，速度慢但有點硬
@@ -206,10 +261,10 @@ export const ENEMIES = [
         id: "ghost",
         name: "遊蕩的鬼魂",
         emoji: "👻",
-        minLvl: 3,
-        baseHp: 60, baseAtk: 25, baseDef: 0, // 物理防禦低
+        minLvl: 2,
+        baseHp: 55, baseAtk: 12, baseDef: 0, // ✨ 核心削弱：攻擊力大幅降低
         exp: 30,
-        baseStr: 2, baseAgi: 12, baseCon: 4, baseTec: 10, baseSpeed: 16, // 速度快，難以捉摸
+        baseStr: 2, baseAgi: 14, baseCon: 4, baseTec: 10, baseSpeed: 18, // ✨ 補償：速度和敏捷微幅提升，更難命中
         dropRate: 0.2,
         zone: "common"
     }

@@ -105,14 +105,7 @@ export function hardReset() {
 // ================== 基礎與經驗 ==================
 export function advanceDay() { 
     player.day++; 
-    UI.updateStatus();
-    // Boss 事件範例 (目前先註解掉或保留皆可，看你是否想測試)
-    // if (player.day === 10) { queueBossBattle("boss_orc", "🛑 遠處傳來沉重的腳步聲...半獸人隊長找上門了！"); } 
-    // else if (player.day === 20) { queueBossBattle("boss_dragon", "🛑 天空變暗，巨大的陰影籠罩大地...遠古巨龍降臨！"); }
-    autoSave();
-}
-
-function queueBossBattle(bossId, warningMsg) {
+    UI.updateSBossBattle(bossId, warningMsg) {
     UI.addLog(warningMsg, "log-critical");
     const checkAndStart = () => {
         if (gameState.inBattle || gameState.isProcessingTurn || gameState.mode === 'merchant') {
@@ -311,7 +304,54 @@ export function withdrawGold() {
     autoSave();
 }
 
-function generateRandomEquipment(level) { const minL = 1; const maxL = level + 2; let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL); if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]]; const template = candidates[Math.floor(Math.random() * candidates.length)]; let quality = ITEM_PREFIXES[1]; const roll = Math.random(); if (roll < 0.2) quality = ITEM_PREFIXES[0]; else if (roll < 0.7) quality = ITEM_PREFIXES[1]; else if (roll < 0.85) quality = ITEM_PREFIXES[2]; else if (roll < 0.95) quality = ITEM_PREFIXES[3]; else if (roll < 0.99) quality = ITEM_PREFIXES[4]; else quality = ITEM_PREFIXES[5]; let stats = {}; if(template.baseAtk) stats.atk = Math.floor(template.baseAtk * quality.mod); if(template.baseDef) stats.def = Math.floor(template.baseDef * quality.mod); if(template.magicAtk) stats.magicAtk = Math.floor(template.magicAtk * quality.mod); if(template.str) stats.str = Math.ceil(template.str * quality.mod); if(template.int) stats.int = Math.ceil(template.int * quality.mod); if(template.agi) stats.agi = Math.ceil(template.agi * quality.mod); if(template.con) stats.con = Math.ceil(template.con * quality.mod); if(template.hp) stats.hp = Math.floor(template.hp * quality.mod); if(template.mp) stats.mp = Math.floor(template.mp * quality.mod); if(template.slots) stats.slots = template.slots; const buyPrice = Math.max(1, Math.floor((template.basePrice || 50) * quality.mod)); const sellPrice = Math.floor(buyPrice / 2); return { name: quality.name + template.name, emoji: template.emoji, type: "equip", slot: template.type, stats: stats, sellPrice: sellPrice, price: buyPrice, usable: true, stackable: false }; }
+function generateRandomEquipment(level) {
+    // 1. 選擇裝備基底
+    const maxL = level + 2;
+    let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL);
+    if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]];
+    const template = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // 2. 選擇品質詞綴 (使用權重選擇)
+    const quality = getWeightedRandomItem(ITEM_PREFIXES) || ITEM_PREFIXES[1];
+
+    // 3. 根據品質，決定是否有魔法詞綴
+    let enchantment = null;
+    if (Math.random() < quality.enchantChance) {
+        enchantment = getWeightedRandomItem(ITEM_ENCHANTMENTS);
+    }
+
+    // 4. 計算最終屬性
+    let finalStats = {};
+    const allStats = { ...template, ...template.stats }; // 合併基底屬性
+
+    // 遍歷所有可能的屬性
+    ['baseAtk', 'baseDef', 'magicAtk', 'str', 'int', 'agi', 'con', 'hp', 'mp', 'tec', 'slots'].forEach(key => {
+        let value = 0;
+        // a. 加上基底屬性 (乘以品質倍率)
+        if (allStats[key]) {
+            // slots 不應該被倍率影響
+            value += (key === 'slots') ? allStats[key] : Math.ceil(allStats[key] * quality.mod);
+        }
+        // b. 加上魔法詞綴屬性
+        if (enchantment && enchantment.stats[key]) {
+            value += enchantment.stats[key];
+        }
+
+        if (value > 0) {
+            // 將 baseAtk/baseDef 轉為最終的 atk/def
+            const finalKey = key === 'baseAtk' ? 'atk' : (key === 'baseDef' ? 'def' : key);
+            finalStats[finalKey] = (finalStats[finalKey] || 0) + value;
+        }
+    });
+
+    // 5. 組合名稱與價格
+    const finalName = `${enchantment ? enchantment.name : ''}${quality.name}${template.name}`;
+    const priceMultiplier = quality.mod + (enchantment ? 0.5 : 0); // 魔法詞綴額外加價
+    const buyPrice = Math.max(1, Math.floor((template.basePrice || 50) * priceMultiplier));
+    const sellPrice = Math.floor(buyPrice / 2);
+
+    return { name: finalName, emoji: template.emoji, type: "equip", slot: template.type, stats: finalStats, sellPrice: sellPrice, price: buyPrice, usable: true, stackable: false };
+}
 
 // ✨ 新增：通用的權重隨機物品選擇器
 function getWeightedRandomItem(items) {
@@ -787,6 +827,11 @@ function handleEventEffect(event) {
             player.hunger = Math.max(0, Math.min(player.hungerMax, player.hunger + effect.value));
         } else if (effect.target === 'state') {
             player.state = effect.value;
+            // ✨ 核心改造：當狀態被設定時，同時設定持續時間
+            if (player.state === "中毒" || player.state === "重傷") {
+                player.statusDuration = 3;
+                UI.addLog(`(此狀態將在 3 次探索後解除)`, "log-system");
+            }
         }
         // 未來可以擴充更多效果，如獲得物品、金錢等
 
@@ -842,20 +887,33 @@ function triggerEvent(explorationType) {
     validEvents = validEvents.map(event => {
         const newEvent = { ...event };
         if (explorationType === 'cautious') { // 小心探索
+            // ✨ 核心改造：應用探索屬性
+            if (newEvent.type === 'loot') newEvent.chance += (player.lootFindBonus || 0);
+            if (newEvent.type === 'exit') newEvent.chance += (player.exitFindBonus || 0);
+
             if (newEvent.type === 'combat') newEvent.chance *= 0.5; // 戰鬥機率減半
             if (newEvent.lootType === 'material') newEvent.chance *= 1.5; // 素材機率提升
         } else if (explorationType === 'deep') { // 深入探索
+            if (newEvent.type === 'loot') newEvent.chance += (player.lootFindBonus || 0);
+
             if (newEvent.type === 'combat') newEvent.chance *= 1.5; // 戰鬥機率提升
             if (newEvent.lootType === 'treasure') newEvent.chance *= 2.0; // 寶藏機率加倍
         } else if (explorationType === 'search_exit') { // 尋找出口
+            if (newEvent.type === 'exit') newEvent.chance += (player.exitFindBonus || 0);
+
             if (newEvent.type === 'exit') newEvent.chance *= 5; // 出口機率 x5
         }
         return newEvent;
     });
 
-    const chosenEvent = getWeightedRandomItem(validEvents);
+    let chosenEvent = getWeightedRandomItem(validEvents);
 
-    if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
+    // ✨ 核心改造：如果沒有任何事件被選中，則觸發一個預設的保底氛圍事件
+    if (!chosenEvent) {
+        chosenEvent = EVENTS.find(e => e.id === 'e_eerie_silence');
+        // 如果連保底事件都找不到，才顯示「什麼也沒發生」
+        if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
+    }
     
     // 根據事件類型執行動作
     if (chosenEvent.type === 'combat') startBattle(zone, depth);
@@ -955,6 +1013,18 @@ export function advanceExploration(explorationType = 'default') {
     gameState.depth++;
     stats.exploredNearby++; // 暫時先統一加到一個統計
     triggerEvent(explorationType);
+
+    // ✨ 核心改造：每次探索後，檢查並更新狀態持續時間
+    if (player.statusDuration > 0) {
+        player.statusDuration--;
+        if (player.statusDuration <= 0) {
+            const oldState = player.state;
+            player.state = "正常";
+            UI.addLog(`經過一番探索，你的 ${oldState} 狀態解除了！`, "log-system");
+        } else {
+            UI.addLog(`(${player.state} 狀態還剩 ${player.statusDuration} 次探索解除)`, "log-system");
+        }
+    }
     autoSave();
 }
 
@@ -1131,18 +1201,40 @@ function startBattle(zone, difficulty = 1, isAmbush = false) {
     gameState.inBattle = true;
     gameState.isProcessingTurn = false;
     gameState.battleLog = [];
-
-    const minTarget = Math.max(1, player.level - 2);
-    const maxTarget = player.level + 2;
-    // ✨ 核心改造：篩選怪物時，同時包含當前區域 (zone) 和通用區域 ("common") 的怪物
-    let candidates = ENEMIES.filter(e => (e.zone === zone || e.zone === "common") && e.minLvl <= maxTarget);
     
-    // 如果根據等級篩選後沒有合適的怪物，則放寬條件，只看區域
-    if (candidates.length === 0) { 
-        candidates = ENEMIES.filter(e => e.zone === zone || e.zone === "common"); 
+    // ✨ 核心改造：基於深度的怪物分層生成
+    const depth = gameState.depth;
+    const depthThreshold = 10; // 深度門檻，超過 10 層開始變危險
+
+    // 1. 篩選出所有符合當前區域的怪物 (包含通用怪)
+    const allMonstersInZone = ENEMIES.filter(e => (e.zone === zone || e.zone === "common") && !e.isBoss);
+
+    // 2. 根據 minLvl 將怪物分為「淺層」和「深層」
+    //    我們取區域所有怪物 minLvl 的中位數作為分界線
+    const sortedLvls = allMonstersInZone.map(e => e.minLvl).sort((a, b) => a - b);
+    const medianLvl = sortedLvls[Math.floor(sortedLvls.length / 2)] || 3; // 如果找不到就預設為 3
+
+    const safeMonsters = allMonstersInZone.filter(e => e.minLvl <= medianLvl);
+    const deepMonsters = allMonstersInZone.filter(e => e.minLvl > medianLvl);
+
+    let candidates = [];
+    if (depth <= depthThreshold) {
+        // 在安全深度：85% 機率出淺層怪，15% 機率出深層怪 (增加刺激感)
+        candidates = (Math.random() < 0.85 || deepMonsters.length === 0) ? safeMonsters : deepMonsters;
+    } else {
+        // 在危險深度：85% 機率出深層怪，15% 機率出淺層怪 (讓玩家喘口氣)
+        candidates = (Math.random() < 0.85 || safeMonsters.length === 0) ? deepMonsters : safeMonsters;
     }
-    // 如果還是沒有，就從所有怪物裡隨便抓一隻，避免遊戲崩潰
-    if (candidates.length === 0) candidates = [ENEMIES[0]];
+
+    // 如果候選清單是空的 (極端情況)，就從區域所有怪物中選
+    if (candidates.length === 0) {
+        candidates = allMonstersInZone;
+    }
+    // 如果還是空的，就隨便抓一隻，避免遊戲崩潰
+    if (candidates.length === 0) {
+        candidates = [ENEMIES.find(e => !e.isBoss) || ENEMIES[0]];
+    }
+
     const template = candidates[Math.floor(Math.random() * candidates.length)];
     const diffMod = 1 + (difficulty * 0.2); 
     const finalLvl = Math.max(template.minLvl, player.level);
@@ -1600,16 +1692,14 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
 
         inventory.length = 0;
         player.gold -= lostGold;
-        player.hp = 1; 
-        player.state = "重傷";
+        player.hp = 1;
+        player.state = "正常"; // ✨ 核心改造：戰敗後不再給予重傷狀態
         
         gameState.inBattle = false;
         gameState.mode = "town";
         gameState.enemy = null;
         gameState.pendingExp = 0; // ✨ 核心修正：無論是否結算成功，都要在此歸零
-        gameState.isProcessingTurn = false;
-
-        document.getElementById("overlay").style.display = "flex";
+        gameState.isProcessingTById("overlay").style.display = "flex";
         document.getElementById("defeatPanel").style.display = "block";
         document.getElementById("deathPanel").style.display = "none";
         document.getElementById("namePanel").style.display = "none";
