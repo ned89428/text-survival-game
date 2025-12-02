@@ -44,6 +44,7 @@ try {
     window.advanceExploration = Game.advanceExploration;
     window.retreatToTown = Game.retreatToTown;
     window.forceRetreat = Game.forceRetreat; // ✨ 掛載強制撤離函式
+    window.handleChoiceEvent = Game.handleChoiceEvent; // ✨ 掛載選擇事件處理函式
 
     // 4. 戰鬥相關
     window.handleCombat = Game.handleCombat;

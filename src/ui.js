@@ -97,6 +97,24 @@ export function renderMainScreen() {
         
         // 商人模式隱藏倉庫
     } else if (gameState.mode === 'loot-swap') {
+    } else if (gameState.mode === 'choice') {
+        // ✨ 新增：選擇事件的 UI
+        const event = gameState.currentEvent;
+        if (event) {
+            topSection = `
+                <div style="text-align:center; margin-bottom:10px; border: 2px solid #f1c40f; padding: 15px; border-radius: 8px;">
+                    <h3 style="color: #f1c40f; margin: 5px 0;">${event.name}</h3>
+                    <p>${event.desc}</p>
+                </div>`;
+            
+            let choiceButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">`;
+            event.choices.forEach(choice => {
+                choiceButtons += `<button onclick="handleChoiceEvent('${choice.action}')">${choice.text}</button>`;
+            });
+            choiceButtons += `</div>`;
+            actionButtons = choiceButtons;
+        }
+
     } else if (gameState.mode === 'boss-encounter') {
         const bossTemplate = ENEMIES.find(e => e.id === gameState.pendingBossId);
         if (bossTemplate) {

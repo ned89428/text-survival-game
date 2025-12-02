@@ -105,14 +105,7 @@ export function hardReset() {
 // ================== 基礎與經驗 ==================
 export function advanceDay() { 
     player.day++; 
-    UI.updateSBossBattle(bossId, warningMsg) {
-    UI.addLog(warningMsg, "log-critical");
-    const checkAndStart = () => {
-        if (gameState.inBattle || gameState.isProcessingTurn || gameState.mode === 'merchant') {
-            setTimeout(checkAndStart, 1500);
-        } else { startBossBattle(bossId); }
-    };
-    setTimeout(checkAndStart, 2000);
+    UI.updateStatus();
 }
 
 function gainExp(amount) {
@@ -304,15 +297,18 @@ export function withdrawGold() {
     autoSave();
 }
 
-function generateRandomEquipment(level) {
+function generateRandomEquipment(level, depth = 0) {
     // 1. 選擇裝備基底
     const maxL = level + 2;
     let candidates = EQUIP_TEMPLATES.filter(e => e.minLvl <= maxL);
     if (candidates.length === 0) candidates = [EQUIP_TEMPLATES[0]];
     const template = candidates[Math.floor(Math.random() * candidates.length)];
 
-    // 2. 選擇品質詞綴 (使用權重選擇)
-    const quality = getWeightedRandomItem(ITEM_PREFIXES) || ITEM_PREFIXES[1];
+    // ✨ 核心改造：根據深度提升裝備品質
+    const depthBonus = Math.floor(depth / 5); // 每 5 層深度獲得 1 點品質加成
+    const qualityRoll = Math.random() * 100; // 模擬一個 1-100 的骰子
+    // 這裡的邏輯可以更複雜，但我們先用一個簡單的偏移來實現
+    const quality = getWeightedRandomItem(ITEM_PREFIXES, depthBonus * 5) || ITEM_PREFIXES[1];
 
     // 3. 根據品質，決定是否有魔法詞綴
     let enchantment = null;
@@ -354,12 +350,16 @@ function generateRandomEquipment(level) {
 }
 
 // ✨ 新增：通用的權重隨機物品選擇器
-function getWeightedRandomItem(items) {
+function getWeightedRandomItem(items, bonusWeight = 0) {
     const validItems = items.filter(item => item && item.chance > 0);
     if (validItems.length === 0) return null;
 
-    const totalWeight = validItems.reduce((sum, item) => sum + (item.chance || 0), 0);
-    if (totalWeight <= 0) return validItems[Math.floor(Math.random() * validItems.length)];
+    // 簡單地將 bonusWeight 加到所有物品上，變相提升稀有物品的機率
+    const totalWeight = validItems.reduce((sum, item) => sum + (item.chance || 0), 0) + (validItems.length * bonusWeight);
+    if (totalWeight <= 0) {
+        // 如果總權重還是0，就隨機返回一個
+        return validItems[Math.floor(Math.random() * validItems.length)];
+    }
 
     let random = Math.random() * totalWeight;
     for (const item of validItems) {
@@ -371,19 +371,21 @@ function getWeightedRandomItem(items) {
     return validItems[validItems.length - 1];
 }
 
-function lootRandomItem(type) {
+function lootRandomItem(type, depth = 0) {
     let newItem = null;
 
     if (type === "food") {
         const foodItems = CONSUMABLES.filter(c => c.id.includes("food_"));
         const chosenItem = getWeightedRandomItem(foodItems);
         if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
-    } else if (type === "treasure") {
+    } else if (type === "treasure") { // ✨ 核心改造：寶藏現在會生成隨機裝備
         if (Math.random() < 0.6) {
+            // 60% 機率是隨機裝備
+            newItem = generateRandomEquipment(player.level, depth);
+        } else {
+            // 40% 機率是隨機消耗品
             const chosenItem = getWeightedRandomItem(CONSUMABLES);
             if (chosenItem) newItem = { ...chosenItem, sellPrice: Math.floor(chosenItem.price / 2) };
-        } else {
-            newItem = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 10, stackable: true };
         }
     } else if (type === "material") {
         newItem = { id: "mat_common", name: "普通素材", emoji: "🧩", type: "material", usable: false, sellPrice: 5, stackable: true };
@@ -828,6 +830,12 @@ function handleEventEffect(event) {
         } else if (effect.target === 'state') {
             player.state = effect.value;
             // ✨ 核心改造：當狀態被設定時，同時設定持續時間
+            if (effect.value === "中毒" || effect.value === "重傷") {
+                player.statusDuration = 3;
+                UI.addLog(`(此狀態將在 3 次探索後解除)`, "log-system");
+            }
+        } else if (effect.target === 'depth') {
+            gameState.depth += effect.value;
             if (player.state === "中毒" || player.state === "重傷") {
                 player.statusDuration = 3;
                 UI.addLog(`(此狀態將在 3 次探索後解除)`, "log-system");
@@ -881,7 +889,12 @@ function triggerEvent(explorationType) {
     }
 
     // 篩選出當前區域可發生的事件
-    let validEvents = possibleEvents.filter(e => e.zones.includes(zone) && (!e.condition || e.condition()));
+    let validEvents = possibleEvents.filter(e => 
+        e.zones.includes(zone) && 
+        (!e.condition || e.condition()) &&
+        (!e.minDepth || depth >= e.minDepth) && // ✨ 核心改造：篩選最小深度
+        (!e.maxDepth || depth <= e.maxDepth)    // ✨ 核心改造：篩選最大深度
+    );
 
     // ✨ 根據探索類型，動態調整事件權重
     validEvents = validEvents.map(event => {
@@ -917,7 +930,7 @@ function triggerEvent(explorationType) {
     
     // 根據事件類型執行動作
     if (chosenEvent.type === 'combat') startBattle(zone, depth);
-    else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType);
+    else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType, depth);
     else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
     else if (chosenEvent.type === 'boss') {
         const bossName = ENEMIES.find(e => e.id === chosenEvent.bossId)?.name || "強大威脅";
@@ -925,6 +938,12 @@ function triggerEvent(explorationType) {
         gameState.mode = 'boss-encounter';
         gameState.pendingBossId = chosenEvent.bossId;
         UI.renderMainScreen();
+    } else if (chosenEvent.type === 'choice') {
+        // ✨ 核心改造：處理選擇事件
+        gameState.mode = 'choice';
+        gameState.currentEvent = chosenEvent; // 將當前事件存起來
+        UI.renderMainScreen();
+        // 不呼叫 autoSave，等待玩家做出選擇
     }
     else if (chosenEvent.type === 'exit') {
         gameState.canSafelyRetreat = true;
@@ -933,6 +952,39 @@ function triggerEvent(explorationType) {
         // 處理來自 events.js 的自定義事件
         handleEventEffect(chosenEvent);
     }
+}
+
+// ✨ 新增：處理玩家選擇事件的函式
+export function handleChoiceEvent(action) {
+    const event = gameState.currentEvent;
+    if (!event || gameState.mode !== 'choice') return;
+
+    if (action === 'ignore') {
+        UI.addLog("你決定不冒險，小心地繞開了。", "log-system");
+        gameState.mode = 'explore';
+        gameState.currentEvent = null;
+        UI.renderMainScreen();
+        autoSave();
+        return;
+    }
+
+    // 根據 action 查找對應的結果
+    const successOutcome = event.outcomes[`${action}_success`];
+    const failureOutcome = event.outcomes[`${action}_failure`];
+
+    if (Math.random() * 100 < successOutcome.chance) {
+        // 成功
+        UI.addLog(`✅ ${successOutcome.message}`, "log-system");
+        if (successOutcome.lootType) lootRandomItem(successOutcome.lootType, gameState.depth);
+    } else {
+        // 失敗
+        UI.addLog(`❌ ${failureOutcome.message}`, "log-critical");
+        if (failureOutcome.type === 'combat') startBattle(gameState.currentZone, gameState.depth);
+    }
+
+    gameState.mode = 'explore';
+    gameState.currentEvent = null;
+    // lootRandomItem 和 startBattle 會自己呼叫 renderMainScreen 和 autoSave
 }
 
 // ✨ 新增：當旅行計時結束後，呼叫此函式以抵達目的地
@@ -1586,7 +1638,7 @@ function winBattle() {
     const dropChance = baseDrop + (player.int * 0.01);
     if (Math.random() < dropChance) {
         if (Math.random() < 0.8) {
-            const newItem = generateRandomEquipment(enemy.lvl); 
+            const newItem = generateRandomEquipment(enemy.lvl, gameState.depth); 
             inventory.push(newItem); 
         } else { lootRandomItem("treasure"); }
         UI.updateInventory();
