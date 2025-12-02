@@ -39,6 +39,7 @@ export let gameState = {
     travelDestination: null,
     travelTimeRemaining: 0,
     travelTimerId: null,
+    hasSeenExplorationWarning: false, // ✨ 新增：首次探索提醒旗標
     merchantGoods: [],
     pendingExp: 0            // ✨ 修改：現在只用來儲存探索中暫存的「擊殺經驗」
 };
@@ -181,6 +182,7 @@ export function resetGameData() {
     if (gameState.travelTimerId) clearInterval(gameState.travelTimerId);
     gameState.travelDestination = null;
     gameState.travelTimeRemaining = 0;
+    gameState.hasSeenExplorationWarning = false; // ✨ 重置旗標
     gameState.pendingExp = 0; // ✨ 重置暫存經驗
     gameState.canSafelyRetreat = false; gameState.isPlayerTurn = false; gameState.lastActor = null;
     gameState.inBattle = false; 

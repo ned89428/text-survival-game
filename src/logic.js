@@ -740,6 +740,15 @@ export function closeMerchant() {
     gameState.isTownMerchant = false;
     gameState.merchantName = null; // ✨ 清除商人名稱
     gameState.mode = gameState.currentZone ? "explore" : "town";
+    gameState.merchantName = null;
+
+    // ✨ 核心修正：根據商人類型決定返回的模式，避免錯誤傳送
+    if (gameState.isTownMerchant) {
+        gameState.mode = "town"; // 如果是城鎮商人，必定返回城鎮
+    } else {
+        gameState.mode = gameState.currentZone ? "explore" : "town"; // 否則才根據區域判斷
+    }
+
     UI.addLog("結束交易"); 
     UI.updateInventory(); 
     UI.renderMainScreen();
@@ -1048,7 +1057,26 @@ function arriveAtDestination() {
 }
 
 export function startExpedition(zoneId) {
-    if (!canDoExplore(1)) return; // 出發時只檢查，不扣太多
+    // ✨ 核心修正：移除出發時扣除 1 點飢餓的機制。
+    // 同時，將 canDoExplore 中的狀態檢查移到此處，確保玩家在正確的狀態下才能出發。
+    if (!player.alive || !gameState.canAct || gameState.inBattle || gameState.merchantActive) {
+        return;
+    }
+
+    // ✨ 核心改造：首次探索時顯示警告提示
+    if (!gameState.hasSeenExplorationWarning) {
+        const warningMessage = "【首次探索提醒】\n\n外出探索充滿危險，若不幸戰敗，將會損失所有金錢與背包內的物品！\n\n建議您在出發前，先將貴重物品與金錢存入城鎮的倉庫中。\n\n確定要現在出發嗎？";
+        if (confirm(warningMessage)) {
+            // 玩家確認後，標記為已看過，並繼續執行
+            gameState.hasSeenExplorationWarning = true;
+            UI.addLog("你鼓起勇氣，踏上了第一次的冒險旅途。");
+        } else {
+            // 玩家取消，留在城鎮
+            UI.addLog("你決定先做好萬全的準備。", "log-system");
+            return; // 中斷函式執行
+        }
+    }
+
 
     // ✨ 核心改造：在後端邏輯中也加入區域解鎖驗證 (附近區域的 BOSS)
     if (zoneId === 'dungeon' && !player.defeatedBosses.includes('boss_giant_bear')) {
