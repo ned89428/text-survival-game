@@ -97,6 +97,22 @@ export function renderMainScreen() {
         
         // 商人模式隱藏倉庫
     } else if (gameState.mode === 'loot-swap') {
+    } else if (gameState.mode === 'boss-encounter') {
+        const bossTemplate = ENEMIES.find(e => e.id === gameState.pendingBossId);
+        if (bossTemplate) {
+            topSection = `
+                <div style="text-align:center; margin-bottom:10px; border: 2px solid #c0392b; padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 80px; line-height: 1;">${bossTemplate.emoji}</div>
+                    <h3 style="color: #ff7675; margin: 5px 0;">遭遇強敵：${bossTemplate.name}！</h3>
+                    <p>一股強大的壓迫感襲來，這不是普通的敵人。要現在挑戰它嗎？</p>
+                    <p style="font-size: 12px; color: #aaa;">（戰敗將有 ${bossTemplate.killChance * 100}% 的機率直接死亡）</p>
+                </div>`;
+            actionButtons = `
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                    <button onclick="confirmBossBattle()" style="background:#c0392b;">⚔️ 決一死戰</button>
+                    <button onclick="avoidBossBattle()" style="background:#2c3e50;">🤫 小心繞過</button>
+                </div>`;
+        }
         const newItem = gameState.pendingLoot;
         if (newItem) {
             const statsDesc = newItem.type === "equip" ? `<div style="font-size:12px; color:#a29bfe; margin-top:2px;">${getStatsString(newItem.stats)}</div>` : (newItem.desc ? `<div style="font-size:12px; color:#b2bec3; margin-top:2px;">${newItem.desc}</div>` : "");
@@ -118,14 +134,33 @@ export function renderMainScreen() {
         // 3. 新增訓練場介面
         topSection = `<div style="text-align:center; margin-bottom:10px;"><div style="font-size: 60px;">💪</div><h3>訓練場</h3><p>「想變強嗎？來這裡就對了。」</p><div id="trainingMessage" class="training-message"></div></div>`;
         let trainingButtons = `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">`;
-        const cost = 0; // 根據要求，價格暫時為 0
-        trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 1. 力量
-        trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 2. 敏捷
-        trainingButtons += `<button onclick="trainAttribute('tec')">技巧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 3. 技巧
-        trainingButtons += `<button onclick="trainAttribute('con')">體質訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 4. 體質
-        trainingButtons += `<button onclick="trainAttribute('int')">智慧訓練<br><span style="color:#f1c40f">價格: ${cost} G</span></button>`; // 5. 智慧
+        
+        // ✨ 核心改造：為每個屬性按鈕動態計算並顯示價格
+        // ✨ 核心改造：價格計算基於 player.trainedAttrs (已購買次數)
+        const getCost = (attr) => Math.floor(50 + Math.pow((player.trainedAttrs[attr] || 0), 2) * 0.5);
+
+        trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${getCost('str')} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${getCost('agi')} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('tec')">技巧訓練<br><span style="color:#f1c40f">價格: ${getCost('tec')} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('con')">體質訓練<br><span style="color:#f1c40f">價格: ${getCost('con')} G</span></button>`;
+        trainingButtons += `<button onclick="trainAttribute('int')">智慧訓練<br><span style="color:#f1c40f">價格: ${getCost('int')} G</span></button>`;
         trainingButtons += `</div>`;
         actionButtons = `${trainingButtons}<div style="margin-top:10px; text-align:center;"><button onclick="closeTrainingGround()">離開訓練場</button></div>`;
+    } else if (gameState.mode === 'traveling') {
+        // ✨ 新增：旅行模式介面
+        const zoneName = { nearby: "附近", dungeon: "地下城", expedition: "遠征" }[gameState.travelDestination] || "未知地點";
+        const time = gameState.travelTimeRemaining;
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+        topSection = `
+            <div style="text-align:center; margin-bottom:10px; padding: 20px;">
+                <div style="font-size: 60px;">🚶‍♂️...</div>
+                <h3 style="font-size: 18px;">正在前往 <span style="color:#f1c40f;">${zoneName}</span></h3>
+                <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-top: 15px;">${timeString}</p>
+            </div>`;
+        actionButtons = `<div style="text-align:center; opacity:0.7; font-size: 14px;">旅行途中，無法進行其他行動。</div>`;
     } else {
         // === 城鎮 / 探索模式 ===
         const isExploring = gameState.mode === 'explore'; // 判斷是否在探索中
@@ -159,7 +194,10 @@ export function renderMainScreen() {
         const statusBox = document.getElementById('statusBox');
         const inventoryBox = document.getElementById('inventoryBox');
         if (eventBox && statusBox && inventoryBox) {
-            inventoryBox.style.height = `${eventBox.offsetHeight}px`;
+            // ✨ 核心修正：在訓練場、戰鬥、旅行模式下，不同步高度，避免佈局跳動
+            if (gameState.mode !== 'training' && gameState.mode !== 'battle' && gameState.mode !== 'traveling') {
+                inventoryBox.style.height = `${eventBox.offsetHeight}px`;
+            }
         }
     });
 }
@@ -364,12 +402,24 @@ export function updateStash() {
 export function showTownActions() {
     const act = document.getElementById("actions");
     if (act) {
-        // 調整城鎮按鈕排版
+        // ✨ 核心改造 1：修復損壞的解鎖條件判斷
+        const isDungeonUnlocked = player.defeatedBosses.includes('boss_giant_bear');
+        const isExpeditionUnlocked = player.defeatedBosses.includes('boss_goblin_king');
+
+        const dungeonButton = isDungeonUnlocked
+            ? `<button onclick="startExpedition('dungeon')">🕳️ 探索地下城 (挑戰)</button>`
+            : `<button disabled title="擊敗附近區域的頭目以解鎖">🕳️ 探索地下城 (未解鎖)</button>`;
+
+        const expeditionButton = isExpeditionUnlocked
+            ? `<button onclick="startExpedition('expedition')">🗺️ 踏上遠征 (危險)</button>`
+            : `<button disabled title="擊敗地下城頭目以解鎖">🗺️ 踏上遠征 (未解鎖)</button>`;
+
+        // ✨ 核心改造 2：修復損壞的 HTML 結構
         act.innerHTML = `
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 10px;">
                 <button onclick="startExpedition('nearby')">🌲 前往附近 (蒐集)</button>
-                <button onclick="startExpedition('dungeon')">🕳️ 探索地下城 (挑戰)</button>
-                <button onclick="startExpedition('expedition')">🗺️ 踏上遠征 (危險)</button>
+                ${dungeonButton}
+                ${expeditionButton}
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                 <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>

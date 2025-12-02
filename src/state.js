@@ -6,6 +6,8 @@ export let player = {
     inventoryMaxSlots: 8, // 背包容量
     str: 0, agi: 0, con: 0, int: 0, tec: 0, // 新增 tec
     equipment: { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null },
+    trainedAttrs: { str: 0, agi: 0, con: 0, int: 0, tec: 0 }, // ✨ 新增：追蹤後天訓練次數
+    defeatedBosses: [], // ✨ 新增：追蹤已擊敗的 BOSS ID
     learnedSkills: [], equippedSkills: [],
     hp: 100, maxHP: 100, mp: 20, maxMP: 20, actionGauge: 0, // 新增玩家行動條
     hunger: 100, hungerMax: 100,
@@ -28,7 +30,12 @@ export let gameState = {
     isPlayerTurn: false,     // 標記是否輪到玩家行動
     lastActor: null,         // ✨ 新增：追蹤上一個行動者 ('player' 或 'enemy')
     merchantActive: false, // 是否在商人介面
+    pendingBossId: null,     // ✨ 新增：用於 BOSS 遭遇確認
     canSafelyRetreat: false, // ✨ 新增：能否安全撤離
+    // ✨ 新增：旅行系統狀態
+    travelDestination: null,
+    travelTimeRemaining: 0,
+    travelTimerId: null,
     merchantGoods: [],
     pendingExp: 0            // ✨ 修改：現在只用來儲存探索中暫存的「擊殺經驗」
 };
@@ -132,6 +139,8 @@ export function resetGameData() {
     if (gameState.cooldownTimerId) { clearInterval(gameState.cooldownTimerId); gameState.cooldownTimerId = null; }
     player.name = ""; player.job = ""; player.day = 1; player.level = 1; player.exp = 0; player.expToLevel = 100;
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0; player.tec = 0;
+    player.defeatedBosses = []; // ✨ 重置 BOSS 擊殺記錄
+    player.trainedAttrs = { str: 0, agi: 0, con: 0, int: 0, tec: 0 }; // ✨ 重置訓練次數
     
     player.equipment = { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null };
     player.learnedSkills = []; player.equippedSkills = [];
@@ -146,6 +155,11 @@ export function resetGameData() {
     gameState.depth = 0; // ✨ 重置深度
     gameState.logs = []; 
     gameState.enemy = null; 
+    gameState.pendingBossId = null; // ✨ 重置待處理的 BOSS
+    // ✨ 重置旅行狀態
+    if (gameState.travelTimerId) clearInterval(gameState.travelTimerId);
+    gameState.travelDestination = null;
+    gameState.travelTimeRemaining = 0;
     gameState.pendingExp = 0; // ✨ 重置暫存經驗
     gameState.canSafelyRetreat = false; gameState.isPlayerTurn = false; gameState.lastActor = null;
     gameState.inBattle = false; 

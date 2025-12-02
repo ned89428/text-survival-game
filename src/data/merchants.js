@@ -29,10 +29,6 @@ export const MERCHANTS = {
             { itemId: 'b_leather', type: 'equipment', availableAtLevel: 3 },
             { itemId: 'w_axe', type: 'equipment', availableAtLevel: 5 },
             { itemId: 'h_helm', type: 'equipment', availableAtLevel: 5 },
-            // ✨ 新增：根據要求，販售小皮袋，價格 50
-            { itemId: 'p_small_pouch', type: 'equipment', price: 50, availableAtLevel: 1 },
-            // ✨ 新增：根據要求，販售登山包，價格 100
-            { itemId: 'p_hiking_pack', type: 'equipment', price: 100, availableAtLevel: 1 },
             // 這個商品有特定的覆蓋價格 (比 basePrice 貴)
             { itemId: 'w_sword', type: 'equipment', price: 190, availableAtLevel: 3 },
         ]

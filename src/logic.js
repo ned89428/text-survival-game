@@ -64,6 +64,19 @@ export function checkSaveAndStart() {
             gameState.inBattle = false;
         }
         // 正常模式防呆
+        if (gameState.travelTimerId) {
+            clearInterval(gameState.travelTimerId); // 清除任何從存檔讀取的無效 ID
+            gameState.travelTimerId = null;
+        }
+        // ✨ 核心修正：如果讀檔時正在旅行，則重新啟動計時器
+        if (gameState.mode === 'traveling' && gameState.travelTimeRemaining > 0) {
+            gameState.travelTimerId = setInterval(() => {
+                gameState.travelTimeRemaining--;
+                if (gameState.travelTimeRemaining <= 0) { arriveAtDestination(); }
+                else { UI.renderMainScreen(); } // 只有在還在計時的時候才刷新
+            }, 1000);
+        }
+
         if (gameState.mode === 'town') {
             gameState.inBattle = false;
             gameState.enemy = null;
@@ -707,8 +720,10 @@ export function closeTrainingGround() {
 export function trainAttribute(attribute) {
     if (gameState.mode !== 'training') return;
     
-    // 根據要求，價格暫時為 0
-    const cost = 0;
+    // ✨ 核心改造 1：根據「已購買次數」而非「總屬性值」來計算成本
+    const trainedCount = player.trainedAttrs[attribute] || 0;
+    // ✨ 核心改造 2：使用新的二次方增長公式
+    const cost = Math.floor(50 + Math.pow(trainedCount, 2) * 0.5);
 
     if (player.gold < cost) {
         UI.addLog(`金錢不足，你需要 ${cost} G。`, "log-system");
@@ -716,16 +731,16 @@ export function trainAttribute(attribute) {
     }
 
     player.gold -= cost;
-    player[attribute]++; // 直接增加對應屬性
-    const message = `訓練成功！你的 ${attribute.toUpperCase()} 提升了。`;
-    UI.showTrainingMessage(message); // 顯示暫時訊息
-    UI.addLogWithoutRender(message, "log-system"); // ✨ 新增：只寫入日誌，不重繪整個畫面
+    player.trainedAttrs[attribute]++; // 購買次數 +1
+    player[attribute]++; // 增加對應屬性
+    const message = `訓練成功！你的 ${attribute.toUpperCase()} 提升了。(-${cost} G)`;
+    UI.addLogWithoutRender(message, "log-system");
 
     // ✨ 核心修正：如果訓練的是體質或智慧，則在更新狀態時直接補滿
     const shouldRefill = (attribute === 'con' || attribute === 'int');
     UI.updateStatus(shouldRefill);
 
-    // UI.renderMainScreen(); // 不再需要完整重繪，由 showTrainingMessage 處理
+    UI.renderMainScreen(); // ✨ 核心改造 3：直接重繪整個主畫面，確保價格即時更新
     autoSave();
 }
 
@@ -800,6 +815,26 @@ function triggerEvent(explorationType) {
         ...EVENTS
     ];
 
+    // ✨ 核心改造 1：動態將 BOSS 事件加入事件池
+    // 附近區域 BOSS
+    if (zone === 'nearby' && depth > 15 && !player.defeatedBosses.includes('boss_giant_bear')) {
+        // ✨ 核心改造 2：為 BOSS 出現機率設定上限 (75%)
+        const bossChance = Math.min(75, (depth - 15) * 8); // 每層 +8%，最高 75%
+        possibleEvents.push({ id: 'boss_bear', name: '遭遇巨熊', type: 'boss', bossId: 'boss_giant_bear', chance: bossChance, zones: ['nearby'] });
+    }
+
+    // 地下城 BOSS
+    if (zone === 'dungeon' && depth > 10 && !player.defeatedBosses.includes('boss_goblin_king')) {
+        const bossChance = Math.min(75, (depth - 10) * 5); // 每層 +5%，最高 75%
+        possibleEvents.push({ id: 'boss_goblin', name: '遭遇哥布林王', type: 'boss', bossId: 'boss_goblin_king', chance: bossChance, zones: ['dungeon'] });
+    }
+
+    // 當 BOSS 事件存在時，稍微降低普通戰鬥的權重，避免戰鬥過於頻繁
+    if (possibleEvents.some(e => e.type === 'boss')) {
+        const combatEvent = possibleEvents.find(e => e.id === 'base_combat');
+        if (combatEvent) combatEvent.chance *= 0.6; // 普通戰鬥權重變為 60%
+    }
+
     // 篩選出當前區域可發生的事件
     let validEvents = possibleEvents.filter(e => e.zones.includes(zone) && (!e.condition || e.condition()));
 
@@ -821,11 +856,18 @@ function triggerEvent(explorationType) {
     const chosenEvent = getWeightedRandomItem(validEvents);
 
     if (!chosenEvent) { UI.addLog("什麼也沒發生...", "log-system"); return; }
-
+    
     // 根據事件類型執行動作
     if (chosenEvent.type === 'combat') startBattle(zone, depth);
     else if (chosenEvent.type === 'loot') lootRandomItem(chosenEvent.lootType);
     else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
+    else if (chosenEvent.type === 'boss') {
+        const bossName = ENEMIES.find(e => e.id === chosenEvent.bossId)?.name || "強大威脅";
+        UI.addLog(`‼️ 你感覺到一股強大的氣息... 是 ${bossName}！`, "log-critical");
+        gameState.mode = 'boss-encounter';
+        gameState.pendingBossId = chosenEvent.bossId;
+        UI.renderMainScreen();
+    }
     else if (chosenEvent.type === 'exit') {
         gameState.canSafelyRetreat = true;
         UI.addLog("✨ 你發現了一個隱蔽的出口或傳送陣！現在可以安全撤離了。", "log-system");
@@ -835,25 +877,66 @@ function triggerEvent(explorationType) {
     }
 }
 
-export function startExpedition(zoneId) {
-    if (!canDoExplore(1)) return; // 出發時只檢查，不扣太多
+// ✨ 新增：當旅行計時結束後，呼叫此函式以抵達目的地
+function arriveAtDestination() {
+    const zoneId = gameState.travelDestination;
     const zoneName = { nearby: "附近", dungeon: "地下城", expedition: "遠征" }[zoneId] || "未知區域";
-    
+
+    // 清理旅行狀態
+    if (gameState.travelTimerId) clearInterval(gameState.travelTimerId);
     gameState.mode = "explore";
+    gameState.travelDestination = null;
+    gameState.travelTimeRemaining = 0;
+    gameState.travelTimerId = null;
+
+    // 設置探索狀態
     gameState.currentZone = zoneId;
     gameState.depth = 1;
-    gameState.pendingExp = 0; // ✨ 核心：出發時重置暫存經驗
-    
-    // ✨ 核心改造：根據區域設定初始撤離狀態
-    if (zoneId === 'nearby') {
-        gameState.canSafelyRetreat = true; // 附近可隨時安全撤離
-    } else {
-        gameState.canSafelyRetreat = false; // 地下城和遠征需要找到出口
-    }
+    gameState.pendingExp = 0;
+    gameState.canSafelyRetreat = (zoneId === 'nearby');
 
-    UI.addLog(`你出發前往 ${zoneName} 進行探索。(經驗值將在撤離時結算)`, "log-system");
+    UI.addLog(`✅ 你已抵達 ${zoneName}，開始探索。`, "log-system");
     UI.renderMainScreen();
+    autoSave();
+}
+
+export function startExpedition(zoneId) {
+    if (!canDoExplore(1)) return; // 出發時只檢查，不扣太多
+
+    // ✨ 核心改造：在後端邏輯中也加入區域解鎖驗證 (附近區域的 BOSS)
+    if (zoneId === 'dungeon' && !player.defeatedBosses.includes('boss_giant_bear')) {
+        UI.addLog("擊敗附近區域的頭目才能挑戰地下城。", "log-system");
+        return;
+    }
+    if (zoneId === 'expedition' && !player.defeatedBosses.includes('boss_goblin_king')) {
+        UI.addLog("在擊敗地下城的威脅之前，無法踏上更危險的遠征。", "log-system");
+        return;
+    }
+    
+    // ✨ 核心改造：啟動旅行計時器，而不是直接探索
+    const travelTimes = {
+        nearby: 30,      // 30 秒
+        dungeon: 180,    // 3 分鐘
+        expedition: 600  // 10 分鐘
+    };
+    
+    const zoneName = { nearby: "附近", dungeon: "地下城", expedition: "遠征" }[zoneId] || "未知區域";
+    gameState.mode = 'traveling';
+    gameState.travelDestination = zoneId;
+    gameState.travelTimeRemaining = travelTimes[zoneId] || 30;
+
+    UI.addLog(`你開始動身前往 ${zoneName}...`, "log-system");
     advanceDay(); // 每次出發都算一天
+
+    gameState.travelTimerId = setInterval(() => {
+        gameState.travelTimeRemaining--;
+        if (gameState.travelTimeRemaining <= 0) {
+            arriveAtDestination();
+        }
+        UI.renderMainScreen(); // 每秒刷新一次畫面以更新計時器
+    }, 1000);
+
+    UI.renderMainScreen();
     autoSave();
 }
 
@@ -1051,8 +1134,15 @@ function startBattle(zone, difficulty = 1, isAmbush = false) {
 
     const minTarget = Math.max(1, player.level - 2);
     const maxTarget = player.level + 2;
-    let candidates = ENEMIES.filter(e => e.zone === zone && e.minLvl <= maxTarget);
-    if (candidates.length === 0) { candidates = ENEMIES.filter(e => e.zone === zone); if (candidates.length === 0) candidates = [ENEMIES[0]]; }
+    // ✨ 核心改造：篩選怪物時，同時包含當前區域 (zone) 和通用區域 ("common") 的怪物
+    let candidates = ENEMIES.filter(e => (e.zone === zone || e.zone === "common") && e.minLvl <= maxTarget);
+    
+    // 如果根據等級篩選後沒有合適的怪物，則放寬條件，只看區域
+    if (candidates.length === 0) { 
+        candidates = ENEMIES.filter(e => e.zone === zone || e.zone === "common"); 
+    }
+    // 如果還是沒有，就從所有怪物裡隨便抓一隻，避免遊戲崩潰
+    if (candidates.length === 0) candidates = [ENEMIES[0]];
     const template = candidates[Math.floor(Math.random() * candidates.length)];
     const diffMod = 1 + (difficulty * 0.2); 
     const finalLvl = Math.max(template.minLvl, player.level);
@@ -1379,6 +1469,12 @@ function winBattle() {
     if (enemy.id === "boss_dragon") { gameClear(); return; }
     
     // ✨ 修正：戰鬥勝利後，應該回到探索模式或城鎮模式
+    // ✨ 核心改造 2：如果擊敗的是 BOSS，記錄到玩家狀態中
+    if (enemy.isBoss && !player.defeatedBosses.includes(enemy.id)) {
+        player.defeatedBosses.push(enemy.id);
+        UI.addLog(`🏆 你擊敗了區域頭目：${enemy.name}！新的道路似乎開啟了...`, "log-critical");
+    }
+
     gameState.inBattle = false; // 修正：移除多餘的 "Zone ? "explore" : "town";"
     gameState.mode = gameState.currentZone ? "explore" : "town"; 
     gameState.enemy = null; gameState.isProcessingTurn = false;
@@ -1547,6 +1643,7 @@ export function chooseJob(jobKey) {
     player.str = 0; player.agi = 0; player.con = 0; player.int = 0; 
     player.equipment = { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null }; 
     player.learnedSkills = []; 
+    player.defeatedBosses = []; // ✨ 確保新角色有空的 BOSS 記錄
     player.equippedSkills = []; 
 
     // 2. 根據職業設定初始值
@@ -1581,7 +1678,7 @@ export function chooseJob(jobKey) {
     } 
     
     // 3. 設定初始金錢與物品
-    player.gold = 1000; 
+    player.gold = 150; 
     stash.items = [];
     stash.gold = 0;
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
@@ -1593,7 +1690,7 @@ export function chooseJob(jobKey) {
 
     document.getElementById("overlay").style.display = "none"; 
     UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system"); 
-    UI.addLog(`獲得新手資助：100 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
+    UI.addLog(`獲得新手資助：150 G 與 3 個乾糧包 (已存入倉庫)`, "log-system");
     gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave();
 }
 export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
