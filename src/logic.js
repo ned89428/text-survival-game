@@ -1651,10 +1651,16 @@ export async function attemptToRun() {
     // ✨ 核心改造：逃跑成功率現在取決於玩家與敵人的「速度差」
     const enemySpeed = gameState.enemy.speed || 10; // 確保敵人有基礎速度
     const speedDifference = player.speed - enemySpeed;
-    let escapeChance = 50 + (speedDifference * 1.5); // 每點速度差影響 1.5% 成功率
-
-    // 確保成功率被限制在 10% 到 95% 之間，避免絕對成功或失敗
-    const finalChance = Math.max(10, Math.min(escapeChance, 95));
+    let escapeChance;
+    if (speedDifference > 0) {
+        // 玩家比較快，成功率增加
+        escapeChance = 50 + (speedDifference * 1.5);
+    } else {
+        // 敵人比較快或一樣快，成功率下降（懲罰係數較低）
+        escapeChance = 50 + (speedDifference * 1.2);
+    }
+    // 確保成功率被限制在 20% 到 95% 之間，避免絕對成功或失敗
+    const finalChance = Math.max(20, Math.min(escapeChance, 95));
     if (Math.random() * 100 < finalChance) {
         // 逃跑成功
         gameState.inBattle = false; 
@@ -1727,7 +1733,7 @@ function winBattle() {
 
     // 2. 在必定掉落素材的基礎上，額外有機率掉落隨機裝備
     const baseDrop = enemy.dropRate || 0.1;
-    const dropChance = baseDrop + (player.int * 0.01);
+    const dropChance = baseDrop; // 移除智慧對掉寶率的影響
     if (Math.random() < dropChance) {
         UI.addLog("✨ 運氣不錯！敵人身上還有額外的戰利品！", "log-system");
         const extraLoot = generateLoot("treasure", gameState.depth);
