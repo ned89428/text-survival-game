@@ -1363,8 +1363,11 @@ function startBattle(zone, difficulty = 1, isAmbush = false) {
     const deepMonsters = allMonstersInZone.filter(e => e.minLvl > medianLvl);
 
     let candidates = [];
-    if (depth <= depthThreshold) {
-        // 在安全深度：85% 機率出淺層怪，15% 機率出深層怪 (增加刺激感)
+    // ✨ 核心改造：在「附近」區域的 10 層以內，只會出現安全怪物
+    if (zone === 'nearby' && depth <= 10) {
+        candidates = safeMonsters;
+    } else if (depth <= depthThreshold) {
+        // 在其他區域的安全深度：85% 機率出淺層怪，15% 機率出深層怪 (增加刺激感)
         candidates = (Math.random() < 0.85 || deepMonsters.length === 0) ? safeMonsters : deepMonsters;
     } else {
         // 在危險深度：85% 機率出深層怪，15% 機率出淺層怪 (讓玩家喘口氣)
