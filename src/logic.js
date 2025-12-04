@@ -990,6 +990,7 @@ function triggerEvent(explorationType) {
         gameState.pendingBossId = chosenEvent.bossId;
         const bossName = ENEMIES.find(e => e.id === chosenEvent.bossId)?.name || "強大威脅";
         UI.addLog(`‼️ 你感覺到一股強大的氣息... 是 ${bossName}！`, "log-critical");
+        UI.renderMainScreen(); // ✨ 核心修正：呼叫 UI 更新以顯示選項
     } else if (chosenEvent.type === 'choice') {
         // ✨ 核心改造：處理選擇事件
         gameState.mode = 'choice';
@@ -1283,13 +1284,16 @@ export function forceRetreat() {
     returnToTownCleanup(); // ✨ 核心修正：最後呼叫新的清理函式來重置狀態
 }
 
-function startBossBattle(bossId) {
+export function startBossBattle() {
+    const bossId = gameState.pendingBossId;
+    if (!bossId) return;
+
     gameState.mode = "battle";
     gameState.inBattle = true;
     gameState.isProcessingTurn = false;
     gameState.battleLog = []; 
-
-    const template = ENEMIES.find(e => e.id === bossId);
+    gameState.pendingBossId = null; // 清除待處理的 BOSS
+    const template = ENEMIES.find(e => e.id === bossId); // ✨ 核心修正：從 gameState 取得 bossId
     if (!template) return;
 
     const finalLvl = Math.max(template.minLvl, player.level);
@@ -1324,6 +1328,17 @@ function startBossBattle(bossId) {
     UI.addBattleLog(`⚠️ 警告：${gameState.enemy.name} 出現了！`, "log-critical");
     UI.renderMainScreen();
     startInstantBattle(); // 啟動「瞬間 ATB」戰鬥
+}
+
+// ✨ 新增：繞過 BOSS 的函式
+export function avoidBoss() {
+    if (gameState.mode !== 'boss-encounter') return;
+
+    UI.addLog("你小心翼翼地繞過了強大的氣息，繼續前進...", "log-system");
+    gameState.mode = 'explore'; // 回到探索模式
+    gameState.pendingBossId = null; // 清除待處理的 BOSS
+    UI.renderMainScreen();
+    autoSave();
 }
 
 function startBattle(zone, difficulty = 1, isAmbush = false) {

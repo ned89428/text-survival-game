@@ -168,8 +168,8 @@ export function renderMainScreen() {
                 </div>`;
             actionButtons = `
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                    <button onclick="confirmBossBattle()" style="background:#c0392b;">⚔️ 決一死戰</button>
-                    <button onclick="avoidBossBattle()" style="background:#2c3e50;">🤫 小心繞過</button>
+                    <button onclick="startBossBattle()" style="background:#c0392b;">⚔️ 決一死戰</button>
+                    <button onclick="avoidBoss()" style="background:#2c3e50;">🤫 小心繞過</button>
                 </div>`;
         }
     } else if (gameState.mode === 'training') {
