@@ -179,7 +179,7 @@ export function renderMainScreen() {
         
         // ✨ 核心改造：為每個屬性按鈕動態計算並顯示價格
         // ✨ 核心改造：價格計算基於 player.trainedAttrs (已購買次數)
-        const getCost = (attr) => Math.floor(50 + Math.pow((player.trainedAttrs[attr] || 0), 2) * 0.5);
+        const getCost = (attr) => Math.floor(10 + Math.pow((player.trainedAttrs[attr] || 0), 2) * 0.5);
 
         trainingButtons += `<button onclick="trainAttribute('str')">力量訓練<br><span style="color:#f1c40f">價格: ${getCost('str')} G</span></button>`;
         trainingButtons += `<button onclick="trainAttribute('agi')">敏捷訓練<br><span style="color:#f1c40f">價格: ${getCost('agi')} G</span></button>`;

@@ -784,7 +784,7 @@ export function trainAttribute(attribute) {
     // ✨ 核心改造 1：根據「已購買次數」而非「總屬性值」來計算成本
     const trainedCount = player.trainedAttrs[attribute] || 0;
     // ✨ 核心改造 2：使用新的二次方增長公式
-    const cost = Math.floor(50 + Math.pow(trainedCount, 2) * 0.5);
+    const cost = Math.floor(10 + Math.pow(trainedCount, 2) * 0.5);
 
     if (player.gold < cost) {
         UI.addLog(`金錢不足，你需要 ${cost} G。`, "log-system");
@@ -917,25 +917,17 @@ function triggerEvent(explorationType) {
         ...EVENTS
     ];
 
-    // ✨ 核心改造 1：動態將 BOSS 事件加入事件池
-    // 附近區域 BOSS
-    if (zone === 'nearby' && depth >= 10 && !player.defeatedBosses.includes('boss_giant_bear')) {
-        let bossChance = 0;
-        // ✨ 核心改造：在第 10 層時，給予極高的出現權重以強行觸發
-        if (depth === 10) {
-            bossChance = 1000; // 給予一個超高權重，使其幾乎必定發生
-        } else {
-            bossChance = Math.min(75, (depth - 10) * 8); // 10 層之後，機率恢復正常成長
-        }
-    if (zone === 'nearby' && depth > 15 && !player.defeatedBosses.includes('boss_giant_bear')) {
-        // ✨ 核心改造：BOSS 出現機率為 (深度 - 15) * 8%，上限 75%
-        const bossChance = Math.min(75, (depth - 15) * 8);
+    // ✨ 核心改造：動態將 BOSS 事件加入事件池
+    // 附近區域 BOSS：巨熊（改為與哥布林王相同的深度/機率公式）
+    if (zone === 'nearby' && !player.defeatedBosses.includes('boss_giant_bear') && depth > 15) {
+        // 使用與哥布林王相同的公式：每層 +5%，從 depth 16 開始，最高 75%
+        const bossChance = Math.min(75, (depth - 15) * 5);
         possibleEvents.push({ id: 'boss_bear', name: '遭遇巨熊', type: 'boss', bossId: 'boss_giant_bear', chance: bossChance, zones: ['nearby'] });
     }
-
-    // 地下城 BOSS
-    if (zone === 'dungeon' && depth > 10 && !player.defeatedBosses.includes('boss_goblin_king')) {
-        const bossChance = Math.min(75, (depth - 10) * 5); // 每層 +5%，最高 75%
+    
+    // 地下城 BOSS：哥布林王
+    if (zone === 'dungeon' && !player.defeatedBosses.includes('boss_goblin_king') && depth > 10) {
+        const bossChance = Math.min(75, (depth - 15) * 5); // 每層 +5%，最高 75%
         possibleEvents.push({ id: 'boss_goblin', name: '遭遇哥布林王', type: 'boss', bossId: 'boss_goblin_king', chance: bossChance, zones: ['dungeon'] });
     }
 
@@ -1206,7 +1198,7 @@ export function retreatToTown() {
     returnToTownCleanup(); // ✨ 呼叫新的清理函式
 }
 
-// ✨ 新增：強制撤離函式 (帶懲罰)
+// ✨ 新增：強制撤離函式 (帶懲罚)
 export function forceRetreat() {
     if (gameState.mode !== 'explore') return;
     
@@ -1237,14 +1229,14 @@ export function forceRetreat() {
     UI.addLog(`💸 慌亂中，你遺失了 ${lostGold} G。`, "log-system");
 
     // ✨ 改造：每個物品欄位都有 50% ~ 60% 的獨立機率遺失
-    // ✨ 核心改造 3：懲罰細化到堆疊內的每個物品
+    // ✨ 核心改造 3：懲罰細化到堆棧內的每個物品
     let lostItemsLog = {}; // 使用物件來統計丟失的物品
     for (let i = inventory.length - 1; i >= 0; i--) {
         const item = inventory[i];
         const originalCount = item.count || 1;
         let itemsLostInStack = 0;
 
-        // 遍歷堆疊中的每一個物品
+        // 遍歷堆棧中的每一個物品
         for (let j = 0; j < originalCount; j++) {
             const dropChance = 0.5 + Math.random() * 0.1; // 50% to 60% chance for each individual item
             if (Math.random() < dropChance) {
@@ -1432,7 +1424,7 @@ function startBattle(zone, difficulty = 1, isAmbush = false) {
 function startInstantBattle() {
     // 初始化玩家和敵人的行動條
     player.actionGauge = 0;
-    if (gameState.enemy) gameState.enemy.actionGauge = 0;
+       if (gameState.enemy) gameState.enemy.actionGauge = 0;
     gameState.isPlayerTurn = false;
     gameState.lastActor = null; // ✨ 戰鬥開始時，清除上回合行動記錄
     
@@ -1692,12 +1684,12 @@ export async function attemptToRun() {
         gameState.inBattle = false; 
         gameState.mode = gameState.currentZone ? "explore" : "town";
         gameState.enemy = null; 
-        UI.addLog("🏃‍♂️ 你成功脫離了戰鬥。", "log-battle");
+        UI.addLog("🏃‍♂️ 你成功脫离了戰鬥。", "log-battle");
         UI.renderMainScreen(); 
         autoSave();
         gameState.isProcessingTurn = false; // 解鎖
     } else {
-        // 逃跑失敗，立刻輪到敵人攻擊
+        // 逃跑失敗，立刻輪到敵人攻撃
         UI.addLog("🚫 逃跑失敗！被敵人抓住了！", "log-critical");
         await wait(600);
 
@@ -1705,9 +1697,9 @@ export async function attemptToRun() {
         player.actionGauge -= 100;
         gameState.lastActor = 'player';
 
-        // 直接觸發敵人回合
+        // 直接觸发敵人回合
         const playerDied = await doEnemyMove();
-        gameState.isProcessingTurn = false; // 解鎖
+        gameState.isProcessingTurn = false;
 
         // 如果玩家沒死，則在敵人行動後，重新計算下一回合
         if (!playerDied) {
@@ -1847,7 +1839,11 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
             summaryHtml += `<p>🎒 背包本來就是空的。</p>`;
         }
         
-        defeatSummary.innerHTML = summaryHtml;
+        // 取得正確的 DOM 元素（修正：原本使用未定義的 defeatSummary 會導致錯誤）
+        const defeatSummaryEl = document.getElementById("defeatSummary");
+        if (defeatSummaryEl) {
+            defeatSummaryEl.innerHTML = summaryHtml;
+        }
 
         // ✨ 核心改造：重傷撤退，在清空背包前計算經驗
         const killExp = gameState.pendingExp;
