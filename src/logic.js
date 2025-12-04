@@ -919,9 +919,17 @@ function triggerEvent(explorationType) {
 
     // ✨ 核心改造 1：動態將 BOSS 事件加入事件池
     // 附近區域 BOSS
+    if (zone === 'nearby' && depth >= 10 && !player.defeatedBosses.includes('boss_giant_bear')) {
+        let bossChance = 0;
+        // ✨ 核心改造：在第 10 層時，給予極高的出現權重以強行觸發
+        if (depth === 10) {
+            bossChance = 1000; // 給予一個超高權重，使其幾乎必定發生
+        } else {
+            bossChance = Math.min(75, (depth - 10) * 8); // 10 層之後，機率恢復正常成長
+        }
     if (zone === 'nearby' && depth > 15 && !player.defeatedBosses.includes('boss_giant_bear')) {
-        // ✨ 核心改造 2：為 BOSS 出現機率設定上限 (75%)
-        const bossChance = Math.min(75, (depth - 15) * 8); // 每層 +8%，最高 75%
+        // ✨ 核心改造：BOSS 出現機率為 (深度 - 15) * 8%，上限 75%
+        const bossChance = Math.min(75, (depth - 15) * 8);
         possibleEvents.push({ id: 'boss_bear', name: '遭遇巨熊', type: 'boss', bossId: 'boss_giant_bear', chance: bossChance, zones: ['nearby'] });
     }
 
@@ -1954,7 +1962,7 @@ export function chooseJob(jobKey) {
     const smallManaPotion = CONSUMABLES.find(c => c.id === 'potion_mana_s');
 
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
-    if (smallHealPotion) stash.items.push({ ...smallHealPotion, count: 1 });
+    if (smallHealPotion) stash.items.push({ ...smallHealPotion, count: 3 });
     if (smallManaPotion) stash.items.push({ ...smallManaPotion, count: 1 });
 
     // 4. 更新 UI 並開始遊戲 (核心修正：調整執行順序)

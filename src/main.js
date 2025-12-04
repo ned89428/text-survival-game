@@ -49,8 +49,8 @@ try {
     // 4. 戰鬥相關
     window.handleCombat = Game.handleCombat;
     window.attemptToRun = Game.attemptToRun; // ✨ 掛載新的逃跑函式
-    window.confirmBossBattle = Game.confirmBossBattle; // ✨ 掛載 BOSS 戰確認函式
-    window.avoidBossBattle = Game.avoidBossBattle;     // ✨ 掛載 BOSS 戰迴避函式
+    window.startBossBattle = Game.startBossBattle; // ✨ 核心修正：掛載正確的 BOSS 戰函式
+    window.avoidBoss = Game.avoidBoss;             // ✨ 核心修正：掛載正確的迴避函式
 
     // 5. 商人相關 (請特別注意這裡)
     window.buyItem = Game.buyItem;
