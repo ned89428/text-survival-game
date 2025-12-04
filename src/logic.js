@@ -1911,13 +1911,18 @@ export function chooseJob(jobKey) {
         player.str = 5; 
         player.con = 4;
         player.tec = 1;
+        player.str = 8; // 5 -> 8
+        player.con = 6; // 4 -> 6
+        player.tec = 1; 
         player.learnedSkills.push("s_bash"); 
         player.equippedSkills.push("s_bash"); 
     } else if (jobKey === "archer") { 
         player.job = "弓箭手"; 
         player.agi = 5; 
+        player.agi = 8; // 5 -> 8
         player.str = 2; 
         player.tec = 3;
+        player.tec = 5; // 3 -> 5
         player.learnedSkills.push("s_double_shot"); 
         player.equippedSkills.push("s_double_shot"); 
     } else if (jobKey === "rogue") { 
@@ -1925,12 +1930,16 @@ export function chooseJob(jobKey) {
         player.str = 3; 
         player.agi = 4; 
         player.tec = 3;
+        player.agi = 7; // 4 -> 7
+        player.tec = 5; // 3 -> 5
         player.learnedSkills.push("s_backstab"); 
         player.equippedSkills.push("s_backstab"); 
     } else if (jobKey === "mage") { 
         player.job = "法師"; 
         player.int = 8; 
         player.con = 1; 
+        player.int = 12; // 8 -> 12
+        player.con = 2; // 1 -> 2
         player.tec = 1;
         player.learnedSkills.push("s_fireball"); 
         player.equippedSkills.push("s_fireball"); 
