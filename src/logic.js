@@ -1302,17 +1302,20 @@ export function startBossBattle() {
     gameState.pendingBossId = null; // 清除待處理的 BOSS
     const template = ENEMIES.find(e => e.id === bossId); // ✨ 核心修正：從 gameState 取得 bossId
     if (!template) return;
-
-    const finalLvl = Math.max(template.minLvl, player.level);
+    
+    // ✨ Gemini Code Assist 核心改造：移除動態等級，BOSS 等級固定
+    // BOSS 的強度主要由其基礎數值決定，不再隨玩家等級變動
+    const finalLvl = template.minLvl;
 
     gameState.enemy = {
         ...template, // 複製範本所有屬性
         lvl: finalLvl,
-        hp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2)),
-        maxHp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2)),
-        atk: Math.floor(template.baseAtk * (1 + (finalLvl - template.minLvl) * 0.15)),
-        def: Math.floor(template.baseDef + (finalLvl - template.minLvl) * 1),
-        // 新增：計算衍生屬性
+        // BOSS 的數值直接使用其基礎值，確保挑戰難度的一致性
+        hp: template.baseHp,
+        maxHp: template.baseHp,
+        atk: template.baseAtk,
+        def: template.baseDef,
+        // 衍生屬性也基於其固定等級計算
         hitRate: 80 + (finalLvl * 1) + ((template.baseTec || 0) * 1.5),
         dodge: (finalLvl * 0.8) + ((template.baseAgi || 0) * 1.5),
         critChance: 5 + ((template.baseTec || 0) * 0.2),
@@ -1391,17 +1394,21 @@ function startBattle(zone, difficulty = 1, isAmbush = false) {
     }
 
     const template = candidates[Math.floor(Math.random() * candidates.length)];
-    const diffMod = 1 + (difficulty * 0.2); 
-    const finalLvl = Math.max(template.minLvl, player.level);
+    const diffMod = 1 + (difficulty * 0.2);
+
+    // ✨ Gemini Code Assist 核心改造：移除動態等級，改為深度加成
+    // 怪物等級 = 基礎等級 + (目前深度 / 4)，每 4 層提升 1 級
+    const depthBonusLevel = Math.floor(gameState.depth / 4);
+    const finalLvl = template.minLvl + depthBonusLevel;
 
     // 根據新公式，重新計算敵人數值
     gameState.enemy = {
         ...template, // 複製範本所有屬性
         lvl: finalLvl,
-        hp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2) * diffMod),
-        maxHp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.2) * diffMod),
-        atk: Math.floor(template.baseAtk * (1 + (finalLvl - template.minLvl) * 0.15) * diffMod),
-        def: Math.floor(template.baseDef + (finalLvl - template.minLvl) * 1),
+        hp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.25) * diffMod), // HP 成長從 20% -> 25%
+        maxHp: Math.floor(template.baseHp * (1 + (finalLvl - template.minLvl) * 0.25) * diffMod),
+        atk: Math.floor(template.baseAtk * (1 + (finalLvl - template.minLvl) * 0.18) * diffMod), // ATK 成長從 15% -> 18%
+        def: Math.floor(template.baseDef + (finalLvl - template.minLvl) * 1.2), // DEF 成長從 1 -> 1.2
         exp: Math.floor(template.exp * (1 + (finalLvl - template.minLvl) * 0.1)),
         // 新增：計算衍生屬性
         hitRate: 80 + (finalLvl * 1) + ((template.baseTec || 0) * 1.5),
