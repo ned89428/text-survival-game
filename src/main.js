@@ -66,6 +66,7 @@ try {
     window.openTrainingGround = Game.openTrainingGround;
     window.closeTrainingGround = Game.closeTrainingGround;
     window.trainAttribute = Game.trainAttribute;
+    window.openSkillShop = Game.openSkillShop; // ✨ 掛載技能商店函式
 
     // 7. 食堂相關 (新增)
     window.openCanteen = Game.openCanteen;

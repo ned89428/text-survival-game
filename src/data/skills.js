@@ -5,8 +5,7 @@ export const SKILLS = [
     {
         id: "s_bash",
         name: "強力重擊",
-        job: "戰士",
-        minLvl: 1,
+        job: "通用",
         type: "physical",
         costType: "mp",
         cost: 8,
@@ -19,8 +18,7 @@ export const SKILLS = [
     {
         id: "s_double_shot",
         name: "二連矢",
-        job: "弓箭手",
-        minLvl: 1,
+        job: "通用",
         type: "physical",
         costType: "mp",
         cost: 10,
@@ -34,8 +32,7 @@ export const SKILLS = [
     {
         id: "s_backstab",
         name: "背刺",
-        job: "盜賊",
-        minLvl: 1,
+        job: "通用",
         type: "physical",
         costType: "mp",
         cost: 12,
@@ -49,8 +46,7 @@ export const SKILLS = [
     {
         id: "s_fireball",
         name: "火球術",
-        job: "法師",
-        minLvl: 1,
+        job: "通用",
         type: "magic", 
         costType: "mp",
         cost: 15,
@@ -61,13 +57,51 @@ export const SKILLS = [
     {
         id: "s_ice_storm",
         name: "冰風暴",
-        job: "法師",
-        minLvl: 5,
+        job: "通用",
         type: "magic",
         costType: "mp",
         cost: 20,
         dmgScale: 2.0,
         speedMod: -2, // 比火球術慢
         desc: "消耗 20 MP，造成 200% 無視防禦傷害 (速度 -2)。"
+    },
+
+    // === ✨ Gemini Code Assist 新增：技能書技能 ===
+    {
+        id: "s_high_speed_shot",
+        name: "高速射擊",
+        job: "通用", // 任何職業都能學
+        type: "physical",
+        costType: "mp",
+        cost: 18,
+        dmgScale: 1.1,
+        speedMod: 3,
+        effects: [{ target: 'actionGauge', value: 30 }], // 使用後，返還 30 點行動值
+        desc: "消耗 18 MP，造成 110% 傷害並提升自身 30 行動值。"
+    },
+    {
+        id: "s_shield_bash",
+        name: "盾牌猛擊",
+        job: "通用",
+        type: "physical",
+        costType: "mp",
+        cost: 12,
+        dmgScale: 0.9,
+        speedMod: -2,
+        // 新效果：50% 機率減少敵人 50 點行動值，打斷其節奏
+        effects: [{ target: 'enemy', type: 'actionGauge', value: -50, chance: 0.5 }],
+        desc: "消耗 12 MP，造成 90% 傷害並有 50% 機率擊退敵人 50 行動值。"
+    },
+    {
+        id: "s_meditate",
+        name: "冥想",
+        job: "通用",
+        type: "buff", // 非傷害性技能
+        costType: "mp",
+        cost: 0, // 不消耗 MP
+        dmgScale: 0, // 不造成傷害
+        speedMod: -10, // 需要長時間詠唱，風險高
+        effects: [{ target: 'player', type: 'mp_regen', value: 50 }], // 恢復 50 MP
+        desc: "消耗 1 回合，集中精神恢復 50 MP (速度 -10)。"
     }
 ];

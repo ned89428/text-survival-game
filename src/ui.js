@@ -340,11 +340,28 @@ export function updateStatus(refill = false) {
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
                 <div class="attr-line">STR 力量：${player.str}</div>
                 <div class="attr-line">AGI 敏捷：${player.agi}</div>
+                <div class="attr-line">TEC 技巧：${player.tec}</div>
                 <div class="attr-line">CON 體質：${player.con}</div>
                 <div class="attr-line">INT 智慧：${player.int}</div>
-                <div class="attr-line">TEC 技巧：${player.tec}</div>
+            </div>
+            <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
+                <div style="font-size:14px; color:#aaa; margin-bottom: 5px;">已學習技能</div>
+                <div id="learned-skills-list" style="font-size: 12px; line-height: 1.6;"></div>
             </div>
         `;
+    }
+
+    // ✨ Gemini Code Assist 新增：渲染技能列表
+    const skillsListDiv = document.getElementById("learned-skills-list");
+    if (skillsListDiv) {
+        if (player.learnedSkills.length > 0) {
+            skillsListDiv.innerHTML = player.learnedSkills.map(skillId => {
+                const skill = SKILLS.find(s => s.id === skillId);
+                return skill ? `<div>- ${skill.name}</div>` : '';
+            }).join('');
+        } else {
+            skillsListDiv.innerHTML = `<div style="opacity:0.5;">(尚未學習任何技能)</div>`;
+        }
     }
 }
 
@@ -463,9 +480,10 @@ export function showTownActions() {
                 ${dungeonButton}
                 ${expeditionButton}
             </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 5px;">
                 <button onclick="openTownMerchant()" style="background:#2980b9;">🏪 拜訪商店</button>
                 <button onclick="openTrainingGround()" style="background:#8e44ad;">💪 前往訓練場</button>
+                <button onclick="openSkillShop()" style="background:#d35400;">📖 學習技能</button>
                 <button onclick="openCanteen()" style="background:#e67e22;">🍲 前往食堂</button>
             </div>`;
         act.style.display = "block";

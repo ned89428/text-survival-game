@@ -65,5 +65,18 @@ export const MERCHANTS = {
             levelBonus: 3, // 裝備等級較高
             // 未來可以加上品質要求，例如 mod > 1.5
         }
+    },
+
+    // ✨ Gemini Code Assist 新增：城鎮技能商店
+    SKILL_SHOP: {
+        name: "技能導師",
+        inventory: [
+            // 這裡販賣所有初始可選的技能書
+            { itemId: 'book_bash', type: 'consumable' },
+            { itemId: 'book_double_shot', type: 'consumable' },
+            { itemId: 'book_backstab', type: 'consumable' },
+            { itemId: 'book_fireball', type: 'consumable' },
+            // 如果未來有更多想讓玩家在早期就能買到的技能書，也可以加在這裡
+        ]
     }
 };

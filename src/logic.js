@@ -133,17 +133,6 @@ function checkLevelUp() {
         player.hungerMax += 10;
         player.hunger = player.hungerMax;
         UI.addLog(`⬆️ 你升級了！現在是 Lv ${player.level}。`, "log-system");
-
-        // 升級時自動學習技能
-        SKILLS.forEach(skill => {
-            if (skill.job === player.job && player.level >= skill.minLvl && !player.learnedSkills.includes(skill.id)) {
-                player.learnedSkills.push(skill.id);
-                if (player.equippedSkills.length < 4) {
-                    player.equippedSkills.push(skill.id);
-                }
-                UI.addLog(`💡 你學會了新技能：${skill.name}！`, "log-system");
-            }
-        });
     }
     autoSave();
 }
@@ -514,6 +503,43 @@ export function useItem(i) {
         return; 
     } 
 
+    // ✨ Gemini Code Assist 新增：處理技能書
+    if (item.skillId) {
+        const skill = SKILLS.find(s => s.id === item.skillId);
+        if (!skill) {
+            UI.addLog("錯誤：找不到對應的技能。", "log-system");
+            return;
+        }
+
+        // 檢查是否已學習
+        if (player.learnedSkills.includes(item.skillId)) {
+            UI.addLog(`你已經學會「${skill.name}」了。`, "log-system");
+            return;
+        }
+
+        // 檢查屬性要求
+        if (item.requirements) {
+            for (const [attr, requiredValue] of Object.entries(item.requirements)) {
+                if ((player[attr] || 0) < requiredValue) {
+                    UI.addLog(`屬性不足！學習「${skill.name}」需要 ${requiredValue} 點 ${attr.toUpperCase()}。`, "log-critical");
+                    return;
+                }
+            }
+        }
+
+        // 學習技能
+        player.learnedSkills.push(skill.id);
+        UI.addLog(`💡 你成功學會了新技能：${skill.name}！`, "log-system");
+
+        // ✨ Gemini Code Assist 核心修正：如果技能裝備欄有空位，自動裝備新技能
+        if (player.equippedSkills.length < 4) { // 假設最多裝備 4 個技能
+            player.equippedSkills.push(skill.id);
+            UI.addLog(`新技能「${skill.name}」已自動裝備到快捷欄。`, "log-system");
+        }
+        inventory.splice(i, 1); // 消耗技能書
+        UI.updateInventory(); autoSave(); return;
+    }
+
     if (item.type === "consumable" && item.effects) {
         let effectApplied = false;
         let logMessages = [];
@@ -688,6 +714,11 @@ function openMerchant(merchantType) {
 // 城鎮商人專用函式 (為了讓 UI 按鈕可以呼叫)
 export function openTownMerchant() {
     openMerchant('TOWN');
+}
+
+// ✨ Gemini Code Assist 新增：開啟技能商店的專用函式
+export function openSkillShop() {
+    openMerchant('SKILL_SHOP');
 }
 
 // ✨ 新增：檢查物品是否能加入背包的輔助函式
@@ -1603,7 +1634,57 @@ async function doPlayerMove(action, skillId) {
         UI.addBattleLog(msg, crit ? "log-critical" : "log-battle"); 
         UI.triggerShake();
 
+        // ✨ Gemini Code Assist 擴充：處理技能的特殊效果
+        if (skill && skill.effects) {
+            skill.effects.forEach(effect => {
+                // 處理對自身的行動條效果
+                if (effect.target === 'actionGauge') {
+                    player.actionGauge += effect.value;
+                }
+                // 處理玩家自身的效果 (例如：冥想)
+                else if (effect.target === 'player') {
+                    if (effect.type === 'mp_regen') {
+                        player.mp = Math.min(player.maxMP, player.mp + effect.value);
+                        UI.addBattleLog(`💧 你的魔力恢復了 ${effect.value} 點。`, "log-system");
+                        UI.updateStatus();
+                    }
+                }
+                // 處理對敵人的效果 (例如：盾牌猛擊)
+                else if (effect.target === 'enemy') {
+                    if (effect.type === 'actionGauge' && (!effect.chance || Math.random() < effect.chance)) {
+                        gameState.enemy.actionGauge += effect.value;
+                        UI.addBattleLog(`⚡️ ${gameState.enemy.name} 的行動被打斷了！`, "log-battle");
+                    }
+                }
+            });
+        }
         if (i < hits - 1) await wait(300);
+    }
+
+    // ✨ Gemini Code Assist 擴充：處理技能的特殊效果
+    if (skill && skill.effects) {
+        skill.effects.forEach(effect => {
+            // ✨ BUG 修正：將原本在迴圈內的效果處理移到這裡，並修正判斷條件
+            // 處理玩家自身的效果
+            if (effect.target === 'player') {
+                if (effect.type === 'mp_regen') {
+                    player.mp = Math.min(player.maxMP, player.mp + effect.value);
+                    UI.addBattleLog(`💧 你的魔力恢復了 ${effect.value} 點。`, "log-system");
+                    UI.updateStatus();
+                }
+            }
+            // 處理對敵人的效果
+            else if (effect.target === 'enemy') {
+                if (effect.type === 'actionGauge' && (!effect.chance || Math.random() < effect.chance)) {
+                    gameState.enemy.actionGauge += effect.value;
+                    UI.addBattleLog(`⚡️ ${gameState.enemy.name} 的行動被打斷了！`, "log-battle");
+                }
+            }
+            // 處理對自身的行動條效果 (例如：高速射擊)
+            else if (effect.target === 'actionGauge') {
+                player.actionGauge += effect.value;
+            }
+        });
     }
 
     UI.addBattleLog(`(${enemy.name} 剩餘 ${enemy.hp} HP)`, "log-system");
@@ -2016,7 +2097,9 @@ export function chooseInitialSkill(skillId) {
 export function confirmAttributes() {
     // ✨ 核心改造：雙重保險，如果點數沒點完，直接返回
     if (availablePoints > 0) return;
-    // 1. 將暫存的點數應用到玩家身上
+    
+    // ✨ Gemini Code Assist 核心修正：先賦值，再重置！
+    // 1. 將玩家分配的點數，正確地賦予到角色身上
     player.str = pendingAttrs.str;
     player.agi = pendingAttrs.agi;
     player.con = pendingAttrs.con;
@@ -2024,10 +2107,20 @@ export function confirmAttributes() {
     player.tec = pendingAttrs.tec;
     player.job = "冒險者"; // 設定一個通用職業
 
+    // 2. 重置暫存的點數，為下一次遊戲做準備 (這才是正確的位置)
+    pendingAttrs = { str: 0, agi: 0, con: 0, int: 0, tec: 0 };
+    availablePoints = 20;
+
     // ✨ 核心改造：不直接開始遊戲，而是顯示技能選擇面板
     document.getElementById("attrPanel").style.display = "none";
     document.getElementById("skillPanel").style.display = "block";
     // 此處不存檔，等待玩家選擇技能
 }
 
-export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("attrPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
+export function restartGame() { 
+    resetGameData(); 
+    // ✨ Gemini Code Assist 核心修正：手動重置角色創建流程的狀態
+    pendingAttrs = { str: 0, agi: 0, con: 0, int: 0, tec: 0 };
+    availablePoints = 20;
+    UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("attrPanel").style.display = "none"; document.getElementById("skillPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; 
+}

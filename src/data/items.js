@@ -123,5 +123,58 @@ export const CONSUMABLES = [
         ],
         desc: "恢復 100 MP。",
         chance: 10
+    },
+    // === ✨ Gemini Code Assist 新增：技能書 ===
+    {
+        id: "book_high_speed_shot",
+        name: "技能書：高速射擊",
+        emoji: "📖",
+        type: "consumable",
+        usable: true,
+        price: 1200, // 技能書應該很珍貴
+        stackable: false, // 技能書通常是唯一的
+        skillId: "s_high_speed_shot", // 對應到 skills.js 中的技能 ID
+        requirements: { agi: 20 }, // 學習此技能需要 20 點敏捷
+        desc: "學習技能「高速射擊」。(需要 20 敏捷)"
+    },
+    {
+        id: "book_bash",
+        name: "技能書：強力重擊",
+        emoji: "📖", type: "consumable", usable: true, price: 200, stackable: false,
+        skillId: "s_bash",
+        requirements: { str: 15 },
+        desc: "學習技能「強力重擊」。(需要 15 力量)"
+    },
+    {
+        id: "book_double_shot",
+        name: "技能書：二連矢",
+        emoji: "📖", type: "consumable", usable: true, price: 200, stackable: false,
+        skillId: "s_double_shot",
+        requirements: { agi: 15, tec: 10 },
+        desc: "學習技能「二連矢」。(需要 15 敏捷, 10 技巧)"
+    },
+    {
+        id: "book_backstab",
+        name: "技能書：背刺",
+        emoji: "📖", type: "consumable", usable: true, price: 200, stackable: false,
+        skillId: "s_backstab",
+        requirements: { agi: 20, tec: 15 },
+        desc: "學習技能「背刺」。(需要 20 敏捷, 15 技巧)"
+    },
+    {
+        id: "book_fireball",
+        name: "技能書：火球術",
+        emoji: "📖", type: "consumable", usable: true, price: 200, stackable: false,
+        skillId: "s_fireball",
+        requirements: { int: 15 },
+        desc: "學習技能「火球術」。(需要 15 智慧)"
+    },
+    {
+        id: "book_ice_storm",
+        name: "技能書：冰風暴",
+        emoji: "📖", type: "consumable", usable: true, price: 2200, stackable: false,
+        skillId: "s_ice_storm",
+        requirements: { int: 25 },
+        desc: "學習技能「冰風暴」。(需要 25 智慧)"
     }
 ];
