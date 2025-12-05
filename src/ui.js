@@ -340,9 +340,9 @@ export function updateStatus(refill = false) {
             <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
                 <div class="attr-line">STR 力量：${player.str}</div>
                 <div class="attr-line">AGI 敏捷：${player.agi}</div>
-                <div class="attr-line">TEC 技巧：${player.tec}</div>
                 <div class="attr-line">CON 體質：${player.con}</div>
                 <div class="attr-line">INT 智慧：${player.int}</div>
+                <div class="attr-line">TEC 技巧：${player.tec}</div>
             </div>
         `;
     }

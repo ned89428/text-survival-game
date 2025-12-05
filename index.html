@@ -5,6 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Take It Alive</title>
 <link rel="stylesheet" href="styles.css">
+<!-- ✨ Gemini Code Assist 視覺升級 ✨ -->
+<style>
+    .attr-alloc-grid-v2 {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+        width: 100%;
+        max-width: 400px; /* 限制最大寬度，避免在大螢幕上過寬 */
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .attr-alloc-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #2c3e50;
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px solid #34495e;
+    }
+    .attr-alloc-item .attr-info span {
+        font-weight: bold;
+        font-size: 16px;
+        color: #ecf0f1;
+    }
+    .attr-alloc-item .attr-info p {
+        font-size: 12px;
+        color: #95a5a6;
+        margin: 2px 0 0 0;
+    }
+    .attr-alloc-item .attr-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+</style>
 </head>
 <body>
 
@@ -17,21 +54,39 @@
         <button onclick="confirmName()">確認名字</button>
     </div>
 
-    <div id="jobPanel" class="panel" style="display:none;">
-        <h2>選擇你的職業</h2>
-        <p>每個職業都有不同的初始屬性與成長方向。</p>
+    <div id="attrPanel" class="panel" style="display:none;">
+        <h2>分配你的初始屬性</h2>
+        <p>你共有 <strong id="attr-points" style="color:#f1c40f;">20</strong> 點自由屬性點。必須全部分配完畢才能開始冒險。</p>
+        <div class="attr-alloc-grid-v2">
+            <div class="attr-alloc-item"><div class="attr-info"><span>力量 (STR)</span><p>影響物理攻擊與暴擊傷害</p></div><div class="attr-controls"><button onclick="removePoint('str')">-</button><span id="attr-str">0</span><button onclick="allocatePoint('str')">+</button></div></div>
+            <div class="attr-alloc-item"><div class="attr-info"><span>敏捷 (AGI)</span><p>影響行動速度與閃避能力</p></div><div class="attr-controls"><button onclick="removePoint('agi')">-</button><span id="attr-agi">0</span><button onclick="allocatePoint('agi')">+</button></div></div>
+            <div class="attr-alloc-item"><div class="attr-info"><span>技巧 (TEC)</span><p>影響命中率與暴擊率</p></div><div class="attr-controls"><button onclick="removePoint('tec')">-</button><span id="attr-tec">0</span><button onclick="allocatePoint('tec')">+</button></div></div>
+            <div class="attr-alloc-item"><div class="attr-info"><span>體質 (CON)</span><p>影響最大生命值與物理防禦</p></div><div class="attr-controls"><button onclick="removePoint('con')">-</button><span id="attr-con">0</span><button onclick="allocatePoint('con')">+</button></div></div>
+            <div class="attr-alloc-item"><div class="attr-info"><span>智慧 (INT)</span><p>影響最大魔力值與魔法攻擊</p></div><div class="attr-controls"><button onclick="removePoint('int')">-</button><span id="attr-int">0</span><button onclick="allocatePoint('int')">+</button></div></div>
+        </div>
+        <!-- ✨ Gemini Code Assist 改造：新增隨機分配按鈕 -->
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+            <button onclick="randomlyAllocatePoints()" style="background: #3498db; flex-grow: 1;">🎲 隨機分配</button>
+            <button id="confirmAttrBtn" onclick="confirmAttributes()" style="flex-grow: 2;" disabled>請先分配完所有點數</button>
+       </div>
+    </div>
+
+    <!-- ✨ Gemini Code Assist 新增：初始技能選擇面板 -->
+    <div id="skillPanel" class="panel" style="display:none;">
+        <h2>選擇你的初始技能</h2>
+        <p>根據你的屬性分配，選擇一個最適合的起手技能吧！</p>
         <div class="job-grid">
-            <div class="job-card" onclick="chooseJob('warrior')">
-                <div class="job-name">🛡️ 戰士</div><div class="job-desc">近戰坦克型，高 HP 與防禦。</div>
+            <div class="job-card" onclick="chooseInitialSkill('s_bash')">
+                <div class="job-name">🛡️ 強力重擊</div><div class="job-desc">消耗 8 MP，造成 150% 物理傷害，但出手速度較慢。</div>
             </div>
-            <div class="job-card" onclick="chooseJob('archer')">
-                <div class="job-name">🏹 弓箭手</div><div class="job-desc">高敏捷，擅長閃避與遠程攻擊。</div>
+            <div class="job-card" onclick="chooseInitialSkill('s_double_shot')">
+                <div class="job-name">🏹 二連矢</div><div class="job-desc">消耗 10 MP，快速射出兩箭，每箭造成 80% 物理傷害。</div>
             </div>
-            <div class="job-card" onclick="chooseJob('rogue')">
-                <div class="job-name">🗡️ 盜賊</div><div class="job-desc">身手矯健，速度快，爆擊率較高。</div>
+            <div class="job-card" onclick="chooseInitialSkill('s_backstab')">
+                <div class="job-name">🗡️ 背刺</div><div class="job-desc">消耗 12 MP，發動迅捷的高爆擊攻擊。</div>
             </div>
-            <div class="job-card" onclick="chooseJob('mage')">
-                <div class="job-name">🔮 法師</div><div class="job-desc">高智慧，較容易找到稀有物品與暴擊。</div>
+            <div class="job-card" onclick="chooseInitialSkill('s_fireball')">
+                <div class="job-name">🔮 火球術</div><div class="job-desc">消耗 15 MP，造成 150% 無視防禦的魔法傷害。</div>
             </div>
         </div>
     </div>
@@ -48,7 +103,7 @@
         <p>你被人救回了城鎮，但身上的東西都丟光了...</p>
         <div id="defeatSummary" style="font-size:14px; line-height:1.5; margin: 15px 0; color: #ccc;"></div>
         <button onclick="confirmDefeat()" style="background: #f1c40f; color: #000;">甦醒</button>
-    </div>
+    </div>    
 </div>
 
 <div id="container">

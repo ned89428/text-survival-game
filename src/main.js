@@ -19,11 +19,15 @@ UI.addLog(`歡迎來到${newTitle}。`, "log-system");
 
 try {
     // 1. 系統與存檔 (將 confirmName 移到外面，確保初始畫面能用)
-    window.chooseJob = Game.chooseJob;
     window.restartGame = Game.restartGame;
     window.hardReset = Game.hardReset;
     window.confirmDefeat = Game.confirmDefeat;
     window.confirmName = Game.confirmName; // ✨ 確保 confirmName 被掛載
+    window.allocatePoint = Game.allocatePoint; // ✨ 掛載增加點數函式
+    window.removePoint = Game.removePoint;   // ✨ 掛載移除點數函式
+    window.confirmAttributes = Game.confirmAttributes; // ✨ 掛載確認屬性函式
+    window.randomlyAllocatePoints = Game.randomlyAllocatePoints; // ✨ 掛載隨機分配函式
+    window.chooseInitialSkill = Game.chooseInitialSkill; // ✨ 掛載初始技能選擇函式
 
     // 2. 屬性與背包操作
     window.toggleInventory = UI.toggleInventory || Game.toggleInventory; // 相容檢查

@@ -91,6 +91,13 @@ export function checkSaveAndStart() {
         
         // 🚀 修正：只呼叫 renderMainScreen，它會自己判斷要不要顯示按鈕
         UI.renderMainScreen();
+
+        // ✨ Gemini Code Assist 核心修正：處理戰鬥中重新整理的 BUG
+        // 如果讀檔時發現正在戰鬥中，則重新啟動戰鬥流程
+        if (gameState.mode === 'battle' && gameState.enemy) {
+            UI.addLog("⚡ 重新連接戰鬥...", "log-system");
+            startInstantBattle(); // 重新啟動 ATB 戰鬥循環
+        }
         
     } catch (e) { console.error("存檔損壞", e); document.getElementById("overlay").style.display = "flex"; }
 }
@@ -1900,76 +1907,120 @@ export function confirmDefeat() {
     autoSave();
 }
 
-export function confirmName() { const input = document.getElementById("nameInput"); player.name = input.value.trim() || "無名冒險者"; document.getElementById("namePanel").style.display = "none"; document.getElementById("jobPanel").style.display = "block"; }
-export function chooseJob(jobKey) { 
-    // 1. 重置玩家屬性與裝備
-    player.str = 0; player.agi = 0; player.con = 0; player.int = 0; 
-    player.equipment = { head: null, body: null, weapon: null, accessory: null, backpack: null, shoes: null }; 
-    player.learnedSkills = []; 
-    player.defeatedBosses = []; // ✨ 確保新角色有空的 BOSS 記錄
-    player.equippedSkills = []; 
+export function confirmName() {
+    const input = document.getElementById("nameInput");
+    player.name = input.value.trim() || "無名冒險者";
+    document.getElementById("namePanel").style.display = "none";
+    document.getElementById("attrPanel").style.display = "block";
+    // 初始化配點介面
+    document.getElementById('attr-points').innerText = '20';
+    ['str', 'agi', 'tec', 'con', 'int'].forEach(attr => {
+        document.getElementById(`attr-${attr}`).innerText = '0';
+    });
+    // ✨ 核心改造：顯示介面時，確保按鈕是禁用狀態
+    const confirmBtn = document.getElementById('confirmAttrBtn');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerText = '請先分配完所有點數';
+    }
+}
 
-    // 2. 根據職業設定初始值
-    if (jobKey === "warrior") { 
-        player.job = "戰士"; 
-        player.str = 5; 
-        player.con = 4;
-        player.tec = 1;
-        player.str = 8; // 5 -> 8
-        player.con = 6; // 4 -> 6
-        player.tec = 1; 
-        player.learnedSkills.push("s_bash"); 
-        player.equippedSkills.push("s_bash"); 
-    } else if (jobKey === "archer") { 
-        player.job = "弓箭手"; 
-        player.agi = 5; 
-        player.agi = 8; // 5 -> 8
-        player.str = 2; 
-        player.tec = 3;
-        player.tec = 5; // 3 -> 5
-        player.learnedSkills.push("s_double_shot"); 
-        player.equippedSkills.push("s_double_shot"); 
-    } else if (jobKey === "rogue") { 
-        player.job = "盜賊"; 
-        player.str = 3; 
-        player.agi = 4; 
-        player.tec = 3;
-        player.agi = 7; // 4 -> 7
-        player.tec = 5; // 3 -> 5
-        player.learnedSkills.push("s_backstab"); 
-        player.equippedSkills.push("s_backstab"); 
-    } else if (jobKey === "mage") { 
-        player.job = "法師"; 
-        player.int = 8; 
-        player.con = 1; 
-        player.int = 12; // 8 -> 12
-        player.con = 2; // 1 -> 2
-        player.tec = 1;
-        player.learnedSkills.push("s_fireball"); 
-        player.equippedSkills.push("s_fireball"); 
-    } 
-    
-    // 3. 設定初始金錢與物品
-    player.gold = 200; // 
+let pendingAttrs = { str: 0, agi: 0, con: 0, int: 0, tec: 0 };
+let availablePoints = 20;
+
+// ✨ 新增：檢查剩餘點數並更新按鈕狀態的輔助函式
+function checkPointsAndToggleButton() {
+    const confirmBtn = document.getElementById('confirmAttrBtn');
+    if (!confirmBtn) return;
+    confirmBtn.disabled = (availablePoints > 0);
+    confirmBtn.innerText = (availablePoints > 0) ? `還剩下 ${availablePoints} 點` : '確認分配並開始冒險';
+}
+
+export function allocatePoint(attr) {
+    if (availablePoints > 0) {
+        availablePoints--;
+        pendingAttrs[attr]++;
+        document.getElementById(`attr-${attr}`).innerText = pendingAttrs[attr];
+        document.getElementById('attr-points').innerText = availablePoints;
+    }
+    checkPointsAndToggleButton(); // ✨ 核心改造：每次點擊後都檢查狀態
+}
+
+export function removePoint(attr) {
+    if (pendingAttrs[attr] > 0) {
+        availablePoints++;
+        pendingAttrs[attr]--;
+        document.getElementById(`attr-${attr}`).innerText = pendingAttrs[attr];
+        document.getElementById('attr-points').innerText = availablePoints;
+    }
+    checkPointsAndToggleButton(); // ✨ 核心改造：每次點擊後都檢查狀態
+}
+
+// ✨ Gemini Code Assist 新增：隨機分配屬性點
+export function randomlyAllocatePoints() {
+    // 1. 重置所有暫存點數
+    pendingAttrs = { str: 0, agi: 0, con: 0, int: 0, tec: 0 };
+    availablePoints = 20;
+
+    const attrs = ['str', 'agi', 'tec', 'con', 'int'];
+
+    // 2. 迴圈 20 次，每次隨機分配 1 點
+    for (let i = 0; i < 20; i++) {
+        const randomAttr = attrs[Math.floor(Math.random() * attrs.length)];
+        pendingAttrs[randomAttr]++;
+    }
+
+    // 3. 分配完畢，將剩餘點數設為 0
+    availablePoints = 0;
+
+    // 4. 更新整個 UI 介面
+    document.getElementById('attr-points').innerText = availablePoints;
+    attrs.forEach(attr => document.getElementById(`attr-${attr}`).innerText = pendingAttrs[attr]);
+    checkPointsAndToggleButton(); // 啟用確認按鈕
+}
+
+export function chooseInitialSkill(skillId) {
+    const skill = SKILLS.find(s => s.id === skillId);
+    if (!skill) return;
+
+    // 1. 將技能加入玩家資料
+    player.learnedSkills.push(skill.id);
+    player.equippedSkills.push(skill.id);
+
+    // 2. 設定初始金錢與物品
+    player.gold = 200;
     stash.items = [];
     stash.gold = 0;
-
     const smallHealPotion = CONSUMABLES.find(c => c.id === 'potion_heal_s');
     const smallManaPotion = CONSUMABLES.find(c => c.id === 'potion_mana_s');
-
     stash.items.push({ ...CONSUMABLES[0], count: 3 });
     if (smallHealPotion) stash.items.push({ ...smallHealPotion, count: 3 });
     if (smallManaPotion) stash.items.push({ ...smallManaPotion, count: 1 });
 
-    // 4. 更新 UI 並開始遊戲 (核心修正：調整執行順序)
-    UI.updateInventory(); 
-    UI.updateStash();
-    UI.updateStatus(true); // ✨ 傳入 true，讓 recalcDerivedStats 直接補滿血魔
-
+    // 3. 更新 UI 並開始遊戲
+    UI.updateInventory(); UI.updateStash(); UI.updateStatus(true);
     document.getElementById("overlay").style.display = "none";
-    UI.addLog(`冒險者 ${player.name} (${player.job}) 開始了旅程`, "log-system");
-    // ✨ 核心修改：更新提示訊息
+    UI.addLog(`你學會了初始技能：${skill.name}！`, "log-system");
+    UI.addLog(`冒險者 ${player.name} 開始了旅程`, "log-system");
     UI.addLog(`獲得新手資助：200 G、3 個乾糧包、1 瓶小回復藥水、1 瓶小魔力藥水 (已存入倉庫)`, "log-system");
     gameState.mode = "town"; gameState.canAct = true; UI.renderMainScreen(); autoSave();
 }
-export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字與選擇職業。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("jobPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
+
+export function confirmAttributes() {
+    // ✨ 核心改造：雙重保險，如果點數沒點完，直接返回
+    if (availablePoints > 0) return;
+    // 1. 將暫存的點數應用到玩家身上
+    player.str = pendingAttrs.str;
+    player.agi = pendingAttrs.agi;
+    player.con = pendingAttrs.con;
+    player.int = pendingAttrs.int;
+    player.tec = pendingAttrs.tec;
+    player.job = "冒險者"; // 設定一個通用職業
+
+    // ✨ 核心改造：不直接開始遊戲，而是顯示技能選擇面板
+    document.getElementById("attrPanel").style.display = "none";
+    document.getElementById("skillPanel").style.display = "block";
+    // 此處不存檔，等待玩家選擇技能
+}
+
+export function restartGame() { resetGameData(); UI.updateInventory(); UI.updateStatus(); document.getElementById("eventBox").innerText = "請先輸入名字。"; document.getElementById("actions").innerHTML = ""; document.getElementById("deathPanel").style.display = "none"; document.getElementById("defeatPanel").style.display = "none"; document.getElementById("namePanel").style.display = "block"; document.getElementById("attrPanel").style.display = "none"; document.getElementById("overlay").style.display = "flex"; }
