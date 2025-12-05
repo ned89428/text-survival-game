@@ -103,5 +103,46 @@ export const SKILLS = [
         speedMod: -10, // 需要長時間詠唱，風險高
         effects: [{ target: 'player', type: 'mp_regen', value: 50 }], // 恢復 50 MP
         desc: "消耗 1 回合，集中精神恢復 50 MP (速度 -10)。"
+    },
+
+    // === ✨ Gemini Code Assist 新增：荒野秘術師技能 ===
+    {
+        id: "s_sunder_armor",
+        name: "破甲斬",
+        job: "通用",
+        type: "physical",
+        costType: "mp",
+        cost: 20,
+        dmgScale: 1.8,
+        speedMod: -3,
+        // 新效果：100% 機率降低敵人 20% 防禦，持續 3 回合
+        effects: [{ target: 'enemy', type: 'debuff', stat: 'def', value: -0.2, duration: 3, chance: 1.0 }],
+        desc: "消耗 20 MP，造成 180% 傷害並擊碎敵人護甲，使其防禦降低 20%。"
+    },
+    {
+        id: "s_shadow_step",
+        name: "影襲",
+        job: "通用",
+        type: "physical",
+        costType: "mp",
+        cost: 22,
+        dmgScale: 1.4,
+        speedMod: 6,
+        // 新效果：使用後，賦予自身「閃避提升」狀態，持續 2 回合
+        effects: [{ target: 'player', type: 'buff', stat: 'dodge', value: 50, duration: 2 }],
+        desc: "消耗 22 MP，發動一次迅捷的攻擊，並在 2 回合內大幅提升自身閃避。"
+    },
+    {
+        id: "s_mana_shield",
+        name: "法力護盾",
+        job: "通用",
+        type: "buff",
+        costType: "mp",
+        cost: 15,
+        dmgScale: 0,
+        speedMod: 2,
+        // 新效果：創造一個吸收傷害的護盾，持續 4 回合
+        effects: [{ target: 'player', type: 'buff', stat: 'manaShield', value: 1.5, duration: 4 }],
+        desc: "消耗 15 MP，創造一個能吸收傷害的護盾，吸收量為你智慧的 150%。"
     }
 ];

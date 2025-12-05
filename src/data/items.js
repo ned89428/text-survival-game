@@ -176,5 +176,30 @@ export const CONSUMABLES = [
         skillId: "s_ice_storm",
         requirements: { int: 25 },
         desc: "學習技能「冰風暴」。(需要 25 智慧)"
+    },
+    // === ✨ Gemini Code Assist 新增：荒野秘術師技能書 ===
+    {
+        id: "book_sunder_armor",
+        name: "秘笈：破甲斬",
+        emoji: "📜", type: "consumable", usable: true, price: 3500, stackable: false,
+        skillId: "s_sunder_armor",
+        requirements: { str: 25, con: 15 },
+        desc: "學習稀有技能「破甲斬」。(需要 25 力量, 15 體質)"
+    },
+    {
+        id: "book_shadow_step",
+        name: "秘笈：影襲",
+        emoji: "📜", type: "consumable", usable: true, price: 4200, stackable: false,
+        skillId: "s_shadow_step",
+        requirements: { agi: 30, tec: 20 },
+        desc: "學習稀有技能「影襲」。(需要 30 敏捷, 20 技巧)"
+    },
+    {
+        id: "book_mana_shield",
+        name: "秘笈：法力護盾",
+        emoji: "📜", type: "consumable", usable: true, price: 3800, stackable: false,
+        skillId: "s_mana_shield",
+        requirements: { int: 30 },
+        desc: "學習稀有技能「法力護盾」。(需要 30 智慧)"
     }
 ];

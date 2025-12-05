@@ -66,6 +66,18 @@ export const MERCHANTS = {
             // 未來可以加上品質要求，例如 mod > 1.5
         }
     },
+    
+    // ✨ Gemini Code Assist 新增：荒野技能商人
+    WILD_SKILLS: {
+        name: "荒野秘術師",
+        // 他只會從這幾本稀有的技能書中，隨機挑選 1-2 本來賣
+        inventoryPool: [
+            { itemId: 'book_sunder_armor', type: 'consumable' },
+            { itemId: 'book_shadow_step', type: 'consumable' },
+            { itemId: 'book_mana_shield', type: 'consumable' },
+        ],
+        stockCount: { min: 1, max: 2 } // 每次出現時，販賣 1 到 2 種商品
+    },
 
     // ✨ Gemini Code Assist 新增：城鎮技能商店
     SKILL_SHOP: {

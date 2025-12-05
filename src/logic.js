@@ -700,6 +700,22 @@ function openMerchant(merchantType) {
     if (!merchantData) return;
     
     gameState.merchantActive = true;
+
+    // ✨ Gemini Code Assist 核心改造：處理隨機庫存
+    if (merchantData.stockCount && merchantData.inventoryPool) {
+        const { min, max } = merchantData.stockCount;
+        const count = Math.floor(Math.random() * (max - min + 1)) + min;
+        
+        // 洗牌演算法，確保隨機性
+        const shuffledPool = [...merchantData.inventoryPool].sort(() => 0.5 - Math.random());
+        
+        // 複製一份新的商人資料，避免汙染原始設定
+        const dynamicMerchantData = JSON.parse(JSON.stringify(merchantData));
+        dynamicMerchantData.inventory = shuffledPool.slice(0, count);
+        gameState.merchantGoods = populateMerchantGoods(dynamicMerchantData);
+    } else {
+        gameState.merchantGoods = populateMerchantGoods(merchantType);
+    }
     gameState.mode = "merchant";
     gameState.isTownMerchant = (merchantType === 'TOWN'); // 只有城鎮商人才標記
     gameState.merchantName = merchantData.name; // ✨ 設定商人名稱
@@ -1021,7 +1037,11 @@ function triggerEvent(explorationType) {
         const newItem = generateLoot(chosenEvent.lootType, depth);
         handleLoot(newItem);
     }
-    else if (chosenEvent.type === 'merchant') maybeMerchant(zone);
+    else if (chosenEvent.type === 'merchant') {
+        // ✨ Gemini Code Assist 核心改造：20% 機率遇到技能商人
+        const merchantType = (Math.random() < 0.2) ? 'WILD_SKILLS' : 'WANDERING';
+        openMerchant(merchantType);
+    }
     else if (chosenEvent.type === 'boss') {
         // ✨ 核心修正：先設定好狀態，再呼叫 UI 更新
         gameState.mode = 'boss-encounter';
