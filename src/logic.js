@@ -1997,6 +1997,7 @@ function handlePlayerDeath(reason, forceTrueDeath = false) {
     }
 }
 
+
 export function confirmDefeat() {
     document.getElementById("overlay").style.display = "none";
     document.getElementById("defeatPanel").style.display = "none";
