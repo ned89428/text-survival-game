@@ -7,7 +7,7 @@ body {
 }
 
 #container {
-    max-width: 1200px; /* 加寬容器以容納三欄 */
+    max-width: 960px; /* 縮減容器寬度 */
     margin: auto;
     display: flex;
     flex-direction: column;

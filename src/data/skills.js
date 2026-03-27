@@ -132,4 +132,17 @@ export const SKILLS = [
         effects: [{ target: 'player', type: 'buff', stat: 'dodge', value: 50, duration: 2 }],
         desc: "消耗 22 MP，發動一次迅捷的攻擊，並在 2 回合內大幅提升自身閃避。"
     },
+    {
+        id: "s_mana_shield",
+        name: "法力護盾",
+        job: "通用",
+        type: "buff",
+        costType: "mp",
+        cost: 15,
+        dmgScale: 0,
+        speedMod: 2,
+        // 新效果：創造一個吸收傷害的護盾，持續 4 回合
+        effects: [{ target: 'player', type: 'buff', stat: 'manaShield', value: 1.5, duration: 4 }],
+        desc: "消耗 15 MP，創造一個能吸收傷害的護盾，吸收量為你智慧的 150%。"
+    }
 ];
